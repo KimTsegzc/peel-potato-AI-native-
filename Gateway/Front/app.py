@@ -14,8 +14,28 @@ st.set_page_config(
 
 hide_decoration_bar_style = """
 <style>
-  header {visibility: hidden;}
-  [data-testid="stDecoration"] {display: none;}
+  header,
+  [data-testid="stHeader"],
+  [data-testid="stToolbar"],
+  [data-testid="stStatusWidget"],
+  [data-testid="stHeaderActionElements"],
+  [data-testid="stAppHeader"],
+  .stAppDeployButton,
+  #MainMenu,
+  footer {
+    display: none !important;
+  }
+
+  [data-testid="stDecoration"] {
+    display: none !important;
+  }
+
+  [data-testid="stAppViewContainer"],
+  [data-testid="stMain"],
+  .main {
+    border: 0 !important;
+    box-shadow: none !important;
+  }
 </style>
 """
 st.markdown(hide_decoration_bar_style, unsafe_allow_html=True)
