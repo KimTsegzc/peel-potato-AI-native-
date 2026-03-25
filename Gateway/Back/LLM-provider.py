@@ -37,6 +37,9 @@ def load_config() -> dict:
             config = json.load(fp)
             if not isinstance(config, dict):
                 raise ValueError("config.json root must be a JSON object")
+            wrapped_runtime = config.get("llm_provider_config")
+            if isinstance(wrapped_runtime, dict):
+                return wrapped_runtime
             return config
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid JSON in config file: {config_path} ({exc})") from exc
