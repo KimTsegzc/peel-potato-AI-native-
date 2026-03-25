@@ -1,4 +1,4 @@
-**This is a human write place to make things controllable.**
+**This is a human write file(./architect.md) to make things controllable.**
 **AI agents should read to understand.**
 **No AI should/could/would make any change.**
 
@@ -24,13 +24,13 @@ Let's make this a chatbot-like UI.
 - **farmework:** Streamlit
 - **Style:** Conversational UI/UX
 - **UI Reference:** 
-    1. [ChatGPT](https://chatgpt.com/)
-    2. [Gemini](https://gemini.google.com/)
-    3. [Claude](https://claude.ai/)
+    - [ChatGPT](https://chatgpt.com/)
+    - there is a wanted page look at '.\Gateway\Front\page_referencee.png'
+    - the avatar pic is at '.\Gateway\Front\xiexin-avatar.png'
 
 ## Interactive Components
 - [comp-chat-box]an input box for type and send.
-
+- nothing else for right now!
 
 <!-- BACKEND -->
 # Backend Architect
