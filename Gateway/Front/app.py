@@ -14,6 +14,24 @@ st.set_page_config(
 
 hide_decoration_bar_style = """
 <style>
+  html,
+  body,
+  .stApp,
+  [data-testid="stAppViewContainer"],
+  [data-testid="stMain"],
+  .main {
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  .block-container {
+    max-width: 100% !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
   header,
   [data-testid="stHeader"],
   [data-testid="stToolbar"],
@@ -58,19 +76,23 @@ html = f"""
 
   * {{ box-sizing: border-box; }}
 
+  html,
   body {{
+    height: 100%;
+    overflow: hidden;
     margin: 0;
     background: #ffffff;
     font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   }}
 
   .page {{
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     justify-content: flex-start;
     align-items: center;
     flex-direction: column;
-    padding-top: 90px;
+    padding-top: 132px;
+    overflow: hidden;
   }}
 
   .content {{
@@ -126,8 +148,8 @@ html = f"""
   }}
 
   .input-wrap {{
-    margin-top: 46px;
-    width: 72%;
+    margin-top: 20px;
+    width: 62%;
     max-width: 860px;
     margin-left: auto;
     margin-right: auto;
@@ -189,7 +211,7 @@ html = f"""
   }}
 
   @media (max-width: 900px) {{
-    .page {{ padding-top: 48px; }}
+    .page {{ padding-top: 72px; }}
     .hero-avatar {{ width: 76px; height: 76px; }}
     .hero {{ width: fit-content; max-width: 94%; }}
     .hero-title {{ font-size: 32px; }}
