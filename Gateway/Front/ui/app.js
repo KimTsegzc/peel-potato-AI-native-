@@ -11,6 +11,154 @@ let titleIndex = 0;
 let hasEnteredChatMode = false;
 let requestInFlight = false;
 
+function escapeHtml(text) {
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderInlineMarkdown(text) {
+  return text
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/__([^_]+)__/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/_([^_]+)_/g, "<em>$1</em>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer noopener">$1</a>');
+}
+
+function renderMarkdown(markdownText) {
+  const source = String(markdownText || "").replace(/\r\n/g, "\n");
+  const codeBlocks = [];
+
+  const withCodePlaceholders = source.replace(/```([\w-]+)?\n([\s\S]*?)```/g, (_, language, code) => {
+    const token = `@@CODE_BLOCK_${codeBlocks.length}@@`;
+    const languageLabel = language ? `<div class="code-lang">${escapeHtml(language)}</div>` : "";
+    codeBlocks.push(`<pre class="code-block">${languageLabel}<code>${escapeHtml(code.trimEnd())}</code></pre>`);
+    return token;
+  });
+
+  const lines = withCodePlaceholders.split("\n");
+  const chunks = [];
+  let paragraphLines = [];
+  let listType = null;
+  let listItems = [];
+  let quoteLines = [];
+
+  function flushParagraph() {
+    if (!paragraphLines.length) return;
+    const paragraph = renderInlineMarkdown(escapeHtml(paragraphLines.join("<br>")));
+    chunks.push(`<p>${paragraph}</p>`);
+    paragraphLines = [];
+  }
+
+  function flushList() {
+    if (!listItems.length) return;
+    const tag = listType === "ol" ? "ol" : "ul";
+    chunks.push(`<${tag}>${listItems.map((item) => `<li>${item}</li>`).join("")}</${tag}>`);
+    listType = null;
+    listItems = [];
+  }
+
+  function flushQuote() {
+    if (!quoteLines.length) return;
+    const content = renderInlineMarkdown(escapeHtml(quoteLines.join("<br>")));
+    chunks.push(`<blockquote>${content}</blockquote>`);
+    quoteLines = [];
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      flushQuote();
+      continue;
+    }
+
+    if (/^@@CODE_BLOCK_\d+@@$/.test(trimmed)) {
+      flushParagraph();
+      flushList();
+      flushQuote();
+      chunks.push(trimmed);
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,6})\s+(.*)$/);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      flushQuote();
+      const level = heading[1].length;
+      chunks.push(`<h${level}>${renderInlineMarkdown(escapeHtml(heading[2]))}</h${level}>`);
+      continue;
+    }
+
+    const quote = trimmed.match(/^>\s?(.*)$/);
+    if (quote) {
+      flushParagraph();
+      flushList();
+      quoteLines.push(quote[1]);
+      continue;
+    }
+
+    const unordered = trimmed.match(/^[-*+]\s+(.*)$/);
+    if (unordered) {
+      flushParagraph();
+      flushQuote();
+      if (listType && listType !== "ul") {
+        flushList();
+      }
+      listType = "ul";
+      listItems.push(renderInlineMarkdown(escapeHtml(unordered[1])));
+      continue;
+    }
+
+    const ordered = trimmed.match(/^\d+\.\s+(.*)$/);
+    if (ordered) {
+      flushParagraph();
+      flushQuote();
+      if (listType && listType !== "ol") {
+        flushList();
+      }
+      listType = "ol";
+      listItems.push(renderInlineMarkdown(escapeHtml(ordered[1])));
+      continue;
+    }
+
+    flushList();
+    flushQuote();
+    paragraphLines.push(trimmed);
+  }
+
+  flushParagraph();
+  flushList();
+  flushQuote();
+
+  let rendered = chunks.join("");
+  codeBlocks.forEach((codeBlock, index) => {
+    rendered = rendered.replace(`@@CODE_BLOCK_${index}@@`, codeBlock);
+  });
+  return rendered;
+}
+
+function getBubbleContentEl(bubble) {
+  return bubble.querySelector(".message-content") || bubble;
+}
+
+function setBubbleText(bubble, text) {
+  getBubbleContentEl(bubble).textContent = text || "";
+}
+
+function setBubbleMarkdown(bubble, text) {
+  getBubbleContentEl(bubble).innerHTML = renderMarkdown(text || "");
+}
+
 function syncViewportMetrics() {
   const viewportHeight = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0, 640);
   const chatGap = Math.max(12, Math.round(viewportHeight * 0.02));
@@ -81,7 +229,16 @@ function appendMessage(role, text, options = {}) {
   if (options.waiting) {
     bubble.classList.add("waiting");
   }
-  bubble.textContent = text || "";
+
+  const content = document.createElement("div");
+  content.className = "message-content";
+  bubble.appendChild(content);
+
+  if (options.markdown) {
+    setBubbleMarkdown(bubble, text || "");
+  } else {
+    setBubbleText(bubble, text || "");
+  }
 
   row.appendChild(bubble);
   thread.appendChild(row);
@@ -128,6 +285,7 @@ async function streamChat(userText) {
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
   let assistantBubble = appendMessage("assistant", "正在等待响应...", { waiting: true });
+  let assistantText = "";
 
   while (true) {
     const { value, done } = await reader.read();
@@ -144,34 +302,34 @@ async function streamChat(userText) {
 
       if (event.type === "pulse") {
         if (event.stage === "accepted") {
-          assistantBubble.textContent = "正在连接模型...";
+          setBubbleText(assistantBubble, "正在连接模型...");
           assistantBubble.classList.add("waiting");
         }
         if (event.stage === "first_token") {
-          assistantBubble.textContent = "";
+          assistantText = "";
+          setBubbleMarkdown(assistantBubble, "");
           assistantBubble.classList.remove("waiting");
         }
       }
 
       if (event.type === "delta") {
         assistantBubble.classList.remove("waiting");
-        if (assistantBubble.textContent === "正在等待响应..." || assistantBubble.textContent === "正在连接模型...") {
-          assistantBubble.textContent = "";
-        }
-        assistantBubble.textContent += event.content || "";
+        assistantText += event.content || "";
+        setBubbleMarkdown(assistantBubble, assistantText);
         scrollChatToBottom();
       }
 
       if (event.type === "done") {
         assistantBubble.classList.remove("waiting");
-        assistantBubble.textContent = event.content || assistantBubble.textContent;
+        assistantText = event.content || assistantText;
+        setBubbleMarkdown(assistantBubble, assistantText);
         appendMetrics(assistantBubble, event.metrics);
         scrollChatToBottom();
       }
 
       if (event.type === "error") {
         assistantBubble.classList.remove("waiting");
-        assistantBubble.textContent = `请求失败：${event.message || "unknown error"}`;
+        setBubbleText(assistantBubble, `请求失败：${event.message || "unknown error"}`);
       }
     }
   }

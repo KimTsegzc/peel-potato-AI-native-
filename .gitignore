@@ -1,5 +1,8 @@
 pp/
 .venv/
+.venv311/
+.streamlit/frontend-*.log
+.streamlit/frontend-*.pid
 __pycache__/
 *.pyc
 *.pyo

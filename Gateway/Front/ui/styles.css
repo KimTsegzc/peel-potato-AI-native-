@@ -203,6 +203,79 @@ body {
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
+.message-content > :first-child {
+  margin-top: 0;
+}
+
+.message-content > :last-child {
+  margin-bottom: 0;
+}
+
+.message-content p,
+.message-content ul,
+.message-content ol,
+.message-content blockquote,
+.message-content pre,
+.message-content h1,
+.message-content h2,
+.message-content h3,
+.message-content h4 {
+  margin: 0 0 12px;
+}
+
+.message-content ul,
+.message-content ol {
+  padding-left: 22px;
+}
+
+.message-content li + li {
+  margin-top: 6px;
+}
+
+.message-content a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.message-content code {
+  font-family: "Consolas", "SFMono-Regular", monospace;
+  font-size: 0.92em;
+  background: rgba(15, 23, 42, 0.06);
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+.message-content .code-block {
+  overflow-x: auto;
+  background: #0f172a;
+  color: #e5eefc;
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.message-content .code-block code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  display: block;
+  white-space: pre;
+}
+
+.message-content .code-lang {
+  margin-bottom: 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.message-content blockquote {
+  margin-left: 0;
+  padding-left: 14px;
+  border-left: 3px solid #cbd5e1;
+  color: #475569;
+}
+
 .message-row.user .message-bubble {
   background: #111827;
   color: #ffffff;
