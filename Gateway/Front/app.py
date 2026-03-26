@@ -1,9 +1,12 @@
-from pathlib import Path
 import base64
+import json
+from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
 
+from Gateway.Back.llm_provider import get_model_list
+from Gateway.Back.settings import get_settings
 from orchestrator import ensure_stream_server_running
 
 BASE_DIR = Path(__file__).parent
@@ -72,6 +75,16 @@ with open(avatar_path, "rb") as img_file:
 
 stream_host, stream_port = ensure_stream_server_running()
 stream_api_url = f"http://{stream_host}:{stream_port}/api/chat/stream"
+settings = get_settings()
+app_config_json = json.dumps(
+  {
+    "streamApiUrl": stream_api_url,
+    "availableModels": get_model_list(),
+    "defaultModel": settings.model,
+    "modelStorageKey": "xiexin-da-agent.selected-model",
+  },
+  ensure_ascii=False,
+)
 
 template_html = _read_text_file(UI_DIR / "index.html")
 styles_css = _read_text_file(UI_DIR / "styles.css")
@@ -82,7 +95,7 @@ html = (
     .replace("{{ styles }}", styles_css)
     .replace("{{ script }}", script_js)
     .replace("{{ avatar_b64 }}", avatar_b64)
-  .replace("{{ stream_api_url }}", stream_api_url)
+    .replace("{{ app_config_json }}", app_config_json)
 )
 
 components.html(html, height=COMPONENT_HEIGHT, scrolling=False)

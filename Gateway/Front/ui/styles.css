@@ -3,6 +3,11 @@
   --border: #e5e7eb;
   --bg: #ffffff;
   --muted: #9ca3af;
+  --panel: rgba(255, 255, 255, 0.86);
+  --panel-border: rgba(148, 163, 184, 0.22);
+  --panel-shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
+  --accent: #0f766e;
+  --accent-soft: rgba(15, 118, 110, 0.14);
   --page-height: 100vh;
   --chat-page-gap: 2vh;
 }
@@ -33,6 +38,147 @@ body {
   width: 100%;
   margin: 0 auto;
   position: relative;
+}
+
+.settings-panel {
+  position: fixed;
+  left: calc(50vw - min(1240px, 92vw) / 2);
+  bottom: calc(clamp(16px, 2.8vh, 28px) + 5vh);
+  z-index: 3;
+}
+
+.settings-toggle {
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 252, 0.94)),
+    var(--panel);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(18px);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.settings-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.13);
+}
+
+.settings-toggle:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 14px 34px rgba(15, 23, 42, 0.13);
+}
+
+.settings-toggle span {
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: #0f172a;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.settings-panel.is-open .settings-toggle span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.settings-panel.is-open .settings-toggle span:nth-child(2) {
+  opacity: 0;
+}
+
+.settings-panel.is-open .settings-toggle span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+.settings-body {
+  position: absolute;
+  left: 0;
+  bottom: 62px;
+  width: min(244px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 252, 0.94)),
+    var(--panel);
+  box-shadow: var(--panel-shadow);
+  backdrop-filter: blur(18px);
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  transform-origin: left bottom;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.22s ease;
+  z-index: 3;
+}
+
+.settings-panel.is-open .settings-body {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.settings-field {
+  display: block;
+}
+
+.settings-label {
+  display: block;
+  margin-bottom: 10px;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-option {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(229, 231, 235, 1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--text);
+  padding: 0 14px;
+  font-size: 15px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
+}
+
+.settings-option:hover {
+  transform: translateY(-1px);
+  background: rgba(248, 250, 252, 1);
+}
+
+.settings-option:focus-visible {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+}
+
+.settings-option.is-selected {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+  background: rgba(255, 255, 255, 1);
+}
+
+.settings-option:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
 }
 
 .hero {
@@ -321,6 +467,10 @@ body {
   align-items: start;
 }
 
+.page.chat-mode .settings-panel {
+  left: calc(50vw - min(1240px, 92vw) / 2);
+}
+
 .page.chat-mode .hero {
   grid-column: 1;
   grid-row: 1;
@@ -395,6 +545,7 @@ body {
     margin-top: 0;
     margin-bottom: 0;
     grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     column-gap: 12px;
     row-gap: 10px;
   }
@@ -407,6 +558,16 @@ body {
   .page.chat-mode .hero-avatar {
     width: 52px;
     height: 52px;
+  }
+
+  .settings-panel {
+    left: 16px;
+    bottom: 16px;
+  }
+
+  .settings-body {
+    left: 0;
+    width: min(220px, calc(100vw - 32px));
   }
 
   .chat-thread {

@@ -4,12 +4,163 @@ const inputEl = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
 const pageEl = document.querySelector(".page");
 const chatShellEl = document.getElementById("chat-shell");
+const settingsPanelEl = document.getElementById("settings-panel");
+const settingsToggleEl = document.getElementById("settings-toggle");
+const modelOptionsEl = document.getElementById("model-options");
 const streamApiUrl = window.APP_CONFIG?.streamApiUrl;
+const availableModels = Array.isArray(window.APP_CONFIG?.availableModels)
+  ? window.APP_CONFIG.availableModels.filter((model) => typeof model === "string" && model.trim())
+  : [];
+const defaultModel = typeof window.APP_CONFIG?.defaultModel === "string"
+  ? window.APP_CONFIG.defaultModel.trim()
+  : "";
+const modelStorageKey = typeof window.APP_CONFIG?.modelStorageKey === "string"
+  ? window.APP_CONFIG.modelStorageKey
+  : "xiexin-da-agent.selected-model";
 
 const fullTitle = (heroTitleEl && heroTitleEl.dataset.fulltext) || "";
 let titleIndex = 0;
 let hasEnteredChatMode = false;
 let requestInFlight = false;
+let selectedModel = "";
+let isSettingsOpen = false;
+
+function isKnownModel(model) {
+  return Boolean(model) && availableModels.includes(model);
+}
+
+function readStoredModel() {
+  try {
+    return window.localStorage.getItem(modelStorageKey) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function writeStoredModel(model) {
+  try {
+    if (model) {
+      window.localStorage.setItem(modelStorageKey, model);
+      return;
+    }
+    window.localStorage.removeItem(modelStorageKey);
+  } catch (error) {
+    // Ignore storage failures and continue with in-memory state.
+  }
+}
+
+function getFallbackModel() {
+  if (isKnownModel(defaultModel)) return defaultModel;
+  if (availableModels.length > 0) return availableModels[0];
+  return "";
+}
+
+function resolveSelectedModel() {
+  const storedModel = readStoredModel();
+  if (isKnownModel(storedModel)) {
+    return storedModel;
+  }
+
+  if (storedModel) {
+    writeStoredModel("");
+  }
+
+  return getFallbackModel();
+}
+
+function populateModelOptions() {
+  if (!modelOptionsEl) return;
+
+  modelOptionsEl.innerHTML = "";
+
+  if (availableModels.length === 0) {
+    const emptyState = document.createElement("button");
+    emptyState.type = "button";
+    emptyState.className = "settings-option";
+    emptyState.textContent = "No models available";
+    emptyState.disabled = true;
+    modelOptionsEl.appendChild(emptyState);
+    return;
+  }
+
+  availableModels.forEach((model) => {
+    const optionButton = document.createElement("button");
+    optionButton.type = "button";
+    optionButton.className = "settings-option";
+    optionButton.textContent = model;
+    optionButton.dataset.model = model;
+    optionButton.setAttribute("role", "option");
+    optionButton.setAttribute("aria-selected", String(model === selectedModel));
+    if (model === selectedModel) {
+      optionButton.classList.add("is-selected");
+    }
+    modelOptionsEl.appendChild(optionButton);
+  });
+}
+
+function setSettingsOpen(open) {
+  isSettingsOpen = Boolean(open);
+  if (settingsPanelEl) {
+    settingsPanelEl.classList.toggle("is-open", isSettingsOpen);
+  }
+  if (settingsToggleEl) {
+    settingsToggleEl.setAttribute("aria-expanded", String(isSettingsOpen));
+    settingsToggleEl.setAttribute("aria-label", isSettingsOpen ? "收起设置" : "打开设置");
+  }
+}
+
+function setModelSelectEnabled(enabled) {
+  if (!modelOptionsEl) return;
+  const optionButtons = modelOptionsEl.querySelectorAll(".settings-option");
+  if (optionButtons.length === 0) {
+    return;
+  }
+  optionButtons.forEach((button) => {
+    button.disabled = !enabled;
+  });
+}
+
+function initializeModelSettings() {
+  selectedModel = resolveSelectedModel();
+  populateModelOptions();
+  setModelSelectEnabled(true);
+  setSettingsOpen(false);
+
+  if (settingsToggleEl) {
+    settingsToggleEl.addEventListener("click", function () {
+      setSettingsOpen(!isSettingsOpen);
+    });
+  }
+
+  document.addEventListener("click", function (event) {
+    if (!isSettingsOpen || !settingsPanelEl) return;
+    if (settingsPanelEl.contains(event.target)) return;
+    setSettingsOpen(false);
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      setSettingsOpen(false);
+    }
+  });
+
+  if (!modelOptionsEl) return;
+  modelOptionsEl.addEventListener("click", function (event) {
+    const optionButton = event.target.closest(".settings-option[data-model]");
+    if (!optionButton) return;
+
+    const nextModel = optionButton.dataset.model;
+    if (!isKnownModel(nextModel)) {
+      return;
+    }
+
+    selectedModel = nextModel;
+    writeStoredModel(selectedModel);
+    populateModelOptions();
+    setModelSelectEnabled(!requestInFlight);
+    setSettingsOpen(false);
+  });
+}
 
 function escapeHtml(text) {
   return String(text || "")
@@ -259,9 +410,10 @@ function appendMetrics(bubble, metrics) {
 function setComposerEnabled(enabled) {
   inputEl.disabled = !enabled;
   sendBtn.disabled = !enabled;
+  setModelSelectEnabled(enabled);
 }
 
-async function streamChat(userText) {
+async function streamChat(userText, model) {
   if (!streamApiUrl) {
     throw new Error("streamApiUrl is not configured");
   }
@@ -274,6 +426,7 @@ async function streamChat(userText) {
     body: JSON.stringify({
       user_input: userText,
       smooth: true,
+      model: model || undefined,
     }),
   });
 
@@ -346,14 +499,16 @@ async function handleSubmit() {
   if (requestInFlight) return;
   const text = inputEl.value.trim();
   if (text) {
+    const requestModel = isKnownModel(selectedModel) ? selectedModel : getFallbackModel();
     enterChatMode();
+    setSettingsOpen(false);
     appendMessage("user", text);
     inputEl.value = "";
     requestInFlight = true;
     setComposerEnabled(false);
 
     try {
-      await streamChat(text);
+      await streamChat(text, requestModel);
     } catch (error) {
       appendMessage("assistant", `请求失败：${error.message || error}`);
     } finally {
@@ -399,4 +554,5 @@ if (document.fonts && document.fonts.ready) {
   requestAnimationFrame(startHeroAnimation);
 }
 
+initializeModelSettings();
 inputEl.focus();
