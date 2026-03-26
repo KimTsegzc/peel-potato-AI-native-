@@ -6,7 +6,12 @@ from typing import Iterator, Optional
 
 from openai import OpenAI
 
-from .settings import Settings, get_settings
+from .settings import AVAILABLE_MODELS, Settings, get_settings, load_system_prompt
+
+
+def get_model_list() -> list[str]:
+    """Return the registry of available models (for frontend dropdowns etc.)."""
+    return AVAILABLE_MODELS
 
 VERBOSE_MODE_DEFAULT = True
 STREAM_MODE_DEFAULT = True
@@ -48,7 +53,7 @@ def _extract_usage_metrics(completion) -> dict:
 
 def _build_messages(settings: Settings, user_input: str) -> list[dict]:
     return [
-        {"role": "system", "content": settings.system_prompt},
+        {"role": "system", "content": load_system_prompt()},
         {"role": "user", "content": user_input},
     ]
 

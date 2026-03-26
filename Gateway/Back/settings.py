@@ -9,6 +9,25 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+# 支持的模型列表 —— 维护在代码里，前端从 get_model_list() 读取；
+# 用户只需在 .env 中用 LLM_MODEL 指定当前选用的一个即可。
+AVAILABLE_MODELS: list[str] = [
+    "qwen3.5-plus",
+    "qwen3-max",
+    "qwen3.5-flash",
+    "qwen-turbo"
+]
+
+_SOUL_FILE = REPO_ROOT / "soul.md"
+_DEFAULT_SOUL = """你是谢鑫的数字分身。"""
+
+
+def load_system_prompt() -> str:
+    """每次调用时重新读取 soul.md，改完文件即时生效，无需重启。"""
+    if _SOUL_FILE.exists():
+        return _SOUL_FILE.read_text(encoding="utf-8").strip()
+    return _DEFAULT_SOUL
+
 
 class Settings(BaseSettings):
     api_key: str | None = Field(
@@ -30,12 +49,8 @@ class Settings(BaseSettings):
         ),
     )
     model: str = Field(
-        default="qwen3.5-flash",
-        validation_alias=AliasChoices("LLM_MODEL", "MODEL", "OPENAI_MODEL"),
-    )
-    system_prompt: str = Field(
-        default="You are a helpful assistant.",
-        validation_alias=AliasChoices("LLM_SYSTEM_PROMPT", "SYSTEM_PROMPT"),
+        default=AVAILABLE_MODELS[-1],   # 默认末尾项；.env 里 LLM_MODEL 可覆盖
+        validation_alias=AliasChoices("LLM_MODEL", "OPENAI_MODEL"),
     )
     temperature: float | None = Field(
         default=0.7,

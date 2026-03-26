@@ -11,7 +11,7 @@
 <!-- INFO -->
 # project info
 - **Author:**   XIE Xin
-- **Name:**     Peel Potato
+- **Name:**     XIEXin_da_agent
 - **Design and Devloped in:** Guangzhou
 - *Version:*    2.3
 
@@ -26,8 +26,6 @@
 5. skill-stat:      Offers basic statistical methods to descriptive/predictive analysis.
 6. skill-comm:      LLM-based Comments on data comprehension.
 7. skill-advs:      LLM-based advice to do work, WorkingEnviroments/Goals/Rules/KnowledgeBase needed.
-
-
 
 <!-- Directories -->
 # Directories

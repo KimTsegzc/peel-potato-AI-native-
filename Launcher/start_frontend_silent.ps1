@@ -1,7 +1,9 @@
 param(
     [int]$Port = 8501,
     [string]$PythonOverride = "",
-    [switch]$NoBrowser
+    [switch]$NoBrowser,
+    [switch]$WeChat,
+    [switch]$UseLauncherExe
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,7 +34,7 @@ function Find-Python {
     return $null
 }
 
-if ((-not $PythonOverride) -and (Test-Path $LauncherExe)) {
+if ($UseLauncherExe -and (-not $PythonOverride) -and (Test-Path $LauncherExe)) {
     $launcherArgs = @('--port', $Port)
     if ($NoBrowser) {
         $launcherArgs += '--no-browser'

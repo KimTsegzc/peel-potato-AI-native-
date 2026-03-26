@@ -678,6 +678,7 @@ textarea {
     --settings-bottom: calc(var(--composer-bottom) + var(--keyboard-offset) + (var(--chat-composer-height) - var(--settings-toggle-size)) / 2);
     --chat-rail-top: 18px;
     --thread-scroll-gutter: 14px;
+    --thread-composer-gap: 8px;
     --thread-surface-offset: calc(var(--chat-composer-height) + var(--composer-bottom) + var(--thread-composer-gap));
     --thread-content-tail-space: 6px;
     --topbar-top: max(12px, calc(env(safe-area-inset-top, 0px) + 4px));
@@ -861,6 +862,22 @@ textarea {
     padding: 12px var(--thread-scroll-gutter) var(--thread-content-tail-space) 2px;
   }
 
+  .app-shell.is-wechat.chat-mode {
+    height: var(--app-height);
+    overflow: hidden;
+  }
+
+  .app-shell.is-wechat.chat-mode .chat-stage {
+    margin-top: 0;
+    min-height: calc(var(--app-height) - 8px);
+  }
+
+  .app-shell.is-wechat.chat-mode .chat-surface {
+    top: 54px;
+    bottom: calc(var(--chat-composer-height) + var(--composer-bottom) + 6px);
+    padding-bottom: calc(var(--thread-content-tail-space) + 8px);
+  }
+
   .message-bubble {
     max-width: 88%;
     padding: 14px 16px;
@@ -937,6 +954,19 @@ textarea {
     padding: 10px 12px;
     border-radius: 16px;
     font-size: 10.5px;
+  }
+
+  .app-shell.is-wechat.chat-mode .message-row.assistant .message-bubble,
+  .app-shell.is-wechat.chat-mode .message-row.assistant .message-content {
+    max-height: none;
+  }
+
+  .app-shell.is-wechat.chat-mode .message-row.assistant .message-content {
+    overflow: visible;
+    width: 100%;
+    margin-right: 0;
+    padding-right: 0;
+    scrollbar-gutter: auto;
   }
 
   .app-shell.is-wechat.chat-mode .message-content {

@@ -5,8 +5,7 @@ pp/
 .env.*
 !.env.example
 *.egg-info/
-.streamlit/frontend-*.log
-.streamlit/frontend-*.pid
+.runtime/
 __pycache__/
 *.pyc
 *.pyo

@@ -15,14 +15,29 @@ from urllib.request import urlopen
 
 DEFAULT_PORT = 8501
 DEFAULT_HOST = "127.0.0.1"
+DEFAULT_BACKEND_PORT = 8765
 START_TIMEOUT_SECONDS = 45
-PID_TEMPLATE = "frontend-{port}.pid"
-STDOUT_TEMPLATE = "frontend-{port}.out.log"
-STDERR_TEMPLATE = "frontend-{port}.err.log"
+FRONTEND_PID_TEMPLATE = "frontend-{port}.pid"
+FRONTEND_STDOUT_TEMPLATE = "frontend-{port}.out.log"
+FRONTEND_STDERR_TEMPLATE = "frontend-{port}.err.log"
+BACKEND_PID_TEMPLATE = "backend-{port}.pid"
+BACKEND_STDOUT_TEMPLATE = "backend-{port}.out.log"
+BACKEND_STDERR_TEMPLATE = "backend-{port}.err.log"
 LAUNCHER_LOG_NAME = "go_xiexin.log"
-RUNTIME_DIR_NAME = ".streamlit"
-APP_RELATIVE_PATH = Path("Gateway") / "Front" / "app.py"
+RUNTIME_DIR_NAME = ".runtime"
+FRONTEND_DIR = Path("Gateway") / "Front" / "react-ui"
+BACKEND_SCRIPT = Path("orchestrator.py")
 CREATE_NO_WINDOW = 0x08000000
+
+
+def normalize_frontend_path(frontend_path: str = "") -> str:
+    path = (frontend_path or "").strip()
+    if not path:
+        return ""
+    path = "/" + path.lstrip("/")
+    if path != "/" and not path.endswith("/"):
+        path += "/"
+    return "" if path == "/" else path
 
 
 def is_frozen() -> bool:
@@ -40,9 +55,12 @@ def runtime_paths(repo_root: Path, port: int) -> dict[str, Path]:
     runtime_dir.mkdir(parents=True, exist_ok=True)
     return {
         "runtime_dir": runtime_dir,
-        "pid_file": runtime_dir / PID_TEMPLATE.format(port=port),
-        "stdout_log": runtime_dir / STDOUT_TEMPLATE.format(port=port),
-        "stderr_log": runtime_dir / STDERR_TEMPLATE.format(port=port),
+        "frontend_pid_file": runtime_dir / FRONTEND_PID_TEMPLATE.format(port=port),
+        "frontend_stdout_log": runtime_dir / FRONTEND_STDOUT_TEMPLATE.format(port=port),
+        "frontend_stderr_log": runtime_dir / FRONTEND_STDERR_TEMPLATE.format(port=port),
+        "backend_pid_file": runtime_dir / BACKEND_PID_TEMPLATE.format(port=DEFAULT_BACKEND_PORT),
+        "backend_stdout_log": runtime_dir / BACKEND_STDOUT_TEMPLATE.format(port=DEFAULT_BACKEND_PORT),
+        "backend_stderr_log": runtime_dir / BACKEND_STDERR_TEMPLATE.format(port=DEFAULT_BACKEND_PORT),
         "launcher_log": runtime_dir / LAUNCHER_LOG_NAME,
     }
 
@@ -103,6 +121,14 @@ def resolve_python(repo_root: Path, override: str = "") -> Path | None:
     if which_python:
         return Path(which_python).resolve()
 
+    return None
+
+
+def resolve_npm() -> Path | None:
+    for candidate_name in ("npm.cmd", "npm"):
+        resolved = shutil.which(candidate_name)
+        if resolved:
+            return Path(resolved).resolve()
     return None
 
 
@@ -175,6 +201,10 @@ def stop_existing_frontend(port: int, pid_file: Path, logger: logging.Logger) ->
         time.sleep(1.0)
 
 
+def stop_process_slot(port: int, pid_file: Path, logger: logging.Logger) -> None:
+    stop_existing_frontend(port, pid_file, logger)
+
+
 def is_http_ready(url: str, timeout_seconds: float = 2.0) -> bool:
     try:
         with urlopen(url, timeout=timeout_seconds) as response:
@@ -211,15 +241,22 @@ def read_log_tail(log_path: Path, max_chars: int = 2000) -> str:
     return text[-max_chars:]
 
 
-def start_frontend(repo_root: Path, port: int, python_override: str, launch_browser: bool) -> int:
+def start_frontend(repo_root: Path, port: int, python_override: str, launch_browser: bool, frontend_path: str = "") -> int:
     paths = runtime_paths(repo_root, port)
     logger = configure_logging(paths["launcher_log"])
-    app_path = repo_root / APP_RELATIVE_PATH
+    frontend_dir = repo_root / FRONTEND_DIR
+    backend_script = repo_root / BACKEND_SCRIPT
 
     logger.info("launcher start requested port=%s repo_root=%s frozen=%s", port, repo_root, is_frozen())
 
-    if not app_path.exists():
-        message = f"Frontend app not found: {app_path}"
+    if not frontend_dir.exists():
+        message = f"React frontend not found: {frontend_dir}"
+        logger.error(message)
+        show_messagebox("Go_XIEXin", message, error=True)
+        return 1
+
+    if not backend_script.exists():
+        message = f"Backend script not found: {backend_script}"
         logger.error(message)
         show_messagebox("Go_XIEXin", message, error=True)
         return 1
@@ -231,56 +268,99 @@ def start_frontend(repo_root: Path, port: int, python_override: str, launch_brow
         show_messagebox("Go_XIEXin", message, error=True)
         return 1
 
+    npm_path = resolve_npm()
+    if npm_path is None:
+        message = "No npm executable was found. Install Node.js 20+ and ensure npm is available in PATH."
+        logger.error(message)
+        show_messagebox("Go_XIEXin", message, error=True)
+        return 1
+
     frontend_url = f"http://{DEFAULT_HOST}:{port}"
-    if is_http_ready(frontend_url):
+    browser_url = f"{frontend_url}{normalize_frontend_path(frontend_path)}"
+    backend_url = f"http://{DEFAULT_HOST}:{DEFAULT_BACKEND_PORT}/health"
+    if is_http_ready(frontend_url) and is_http_ready(backend_url):
         logger.info("frontend already healthy, reusing existing instance")
         if launch_browser:
-            open_browser(frontend_url, logger)
+            open_browser(browser_url, logger)
         return 0
 
-    stop_existing_frontend(port, paths["pid_file"], logger)
+    stop_process_slot(port, paths["frontend_pid_file"], logger)
+    stop_process_slot(DEFAULT_BACKEND_PORT, paths["backend_pid_file"], logger)
 
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
 
-    logger.info("starting streamlit with python=%s app=%s", python_path, app_path)
-    with paths["stdout_log"].open("ab") as stdout_handle, paths["stderr_log"].open("ab") as stderr_handle:
-        process = subprocess.Popen(
+    logger.info("starting orchestrator backend with python=%s script=%s", python_path, backend_script)
+    with paths["backend_stdout_log"].open("ab") as backend_stdout_handle, paths["backend_stderr_log"].open("ab") as backend_stderr_handle:
+        backend_process = subprocess.Popen(
             [
                 str(python_path),
-                "-m",
-                "streamlit",
-                "run",
-                str(app_path),
-                "--server.headless",
-                "true",
-                "--server.port",
-                str(port),
+                str(backend_script),
+                "--serve",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                str(DEFAULT_BACKEND_PORT),
             ],
             cwd=repo_root,
+            env=env,
+            stdout=backend_stdout_handle,
+            stderr=backend_stderr_handle,
+            creationflags=CREATE_NO_WINDOW,
+        )
+
+    write_pid(paths["backend_pid_file"], backend_process.pid)
+    logger.info("backend process started pid=%s", backend_process.pid)
+
+    if not wait_for_frontend(backend_url, backend_process, START_TIMEOUT_SECONDS, logger):
+        stderr_tail = read_log_tail(paths["backend_stderr_log"])
+        stdout_tail = read_log_tail(paths["backend_stdout_log"])
+        details = stderr_tail or stdout_tail or "No backend startup logs were captured."
+        message = (
+            "Go_XIEXin could not start the backend service.\n\n"
+            f"Logs: {paths['backend_stderr_log']}\n\n"
+            f"Recent output:\n{details}"
+        )
+        show_messagebox("Go_XIEXin", message, error=True)
+        return 1
+
+    logger.info("starting react frontend with npm=%s dir=%s", npm_path, frontend_dir)
+    with paths["frontend_stdout_log"].open("ab") as stdout_handle, paths["frontend_stderr_log"].open("ab") as stderr_handle:
+        process = subprocess.Popen(
+            [
+                str(npm_path),
+                "run",
+                "dev",
+                "--",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                str(port),
+            ],
+            cwd=frontend_dir,
             env=env,
             stdout=stdout_handle,
             stderr=stderr_handle,
             creationflags=CREATE_NO_WINDOW,
         )
 
-    write_pid(paths["pid_file"], process.pid)
+    write_pid(paths["frontend_pid_file"], process.pid)
     logger.info("frontend process started pid=%s", process.pid)
 
     if not wait_for_frontend(frontend_url, process, START_TIMEOUT_SECONDS, logger):
-        stderr_tail = read_log_tail(paths["stderr_log"])
-        stdout_tail = read_log_tail(paths["stdout_log"])
+        stderr_tail = read_log_tail(paths["frontend_stderr_log"])
+        stdout_tail = read_log_tail(paths["frontend_stdout_log"])
         details = stderr_tail or stdout_tail or "No startup logs were captured."
         message = (
             "Go_XIEXin could not start the frontend.\n\n"
-            f"Logs: {paths['stderr_log']}\n\n"
+            f"Logs: {paths['frontend_stderr_log']}\n\n"
             f"Recent output:\n{details}"
         )
         show_messagebox("Go_XIEXin", message, error=True)
         return 1
 
     if launch_browser:
-        open_browser(frontend_url, logger)
+        open_browser(browser_url, logger)
 
     return 0
 
@@ -289,7 +369,8 @@ def stop_frontend(repo_root: Path, port: int) -> int:
     paths = runtime_paths(repo_root, port)
     logger = configure_logging(paths["launcher_log"])
     logger.info("launcher stop requested port=%s", port)
-    stop_existing_frontend(port, paths["pid_file"], logger)
+    stop_process_slot(port, paths["frontend_pid_file"], logger)
+    stop_process_slot(DEFAULT_BACKEND_PORT, paths["backend_pid_file"], logger)
     return 0
 
 
@@ -299,6 +380,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--python", default="", help="Optional python.exe override.")
     parser.add_argument("--stop", action="store_true", help="Stop the running frontend for the selected port.")
     parser.add_argument("--no-browser", action="store_true", help="Do not open the browser after startup.")
+    parser.add_argument("--wechat", action="store_true", help="Deprecated compatibility flag. Startup no longer switches frontend entry.")
     return parser.parse_args()
 
 
@@ -312,6 +394,7 @@ def main() -> int:
         port=args.port,
         python_override=args.python,
         launch_browser=not args.no_browser,
+        frontend_path="",
     )
 
 

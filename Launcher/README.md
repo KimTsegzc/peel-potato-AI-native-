@@ -1,24 +1,26 @@
 # Launcher 说明
 
-这个目录负责项目的本地启动、停止和打包，关系如下。
+这个目录负责项目的本地启动、停止和打包，当前前端链路已经升级为 `React + Vite`，后端接口由 `orchestrator.py` 单独提供。
 
 ## 文件关系
 
 - `Go_XIEXin.py`
   - 启动核心。
-  - 负责检查 Python、清理旧进程、启动 Streamlit、等待前端就绪、打开浏览器。
+  - 负责检查 Python 和 npm、清理旧进程、启动 `orchestrator.py --serve`、启动 React Vite 前端、等待前后端就绪、打开浏览器。
   - `Go_XIEXin.exe` 本质上就是它打包后的结果。
 
 - `start_frontend_silent.ps1`
   - 启动包装脚本。
-  - 默认优先调用根目录下的 `Go_XIEXin.exe`。
-  - 如果显式传入 `-PythonOverride`，则强制改走 Python 执行 `Go_XIEXin.py`。
-  - 如果 exe 不存在，也会回退到 Python 执行 `Go_XIEXin.py`。
+  - 默认直接调用 Python 执行 `Go_XIEXin.py`，避免命中旧版 exe 残留。
+  - 如果显式传入 `-UseLauncherExe`，才会调用根目录下的 `Go_XIEXin.exe`。
+  - 如果显式传入 `-PythonOverride`，则强制使用指定 Python 执行 `Go_XIEXin.py`。
+  - `-WeChat` 仅保留为兼容参数，不再改变启动入口。
 
 - `stop_frontend.ps1`
   - 停止包装脚本。
-  - 默认优先调用 exe 的 `--stop`。
-  - 如果显式传入 `-PythonOverride`，则强制改走 Python 版启动器的 `--stop`。
+  - 默认直接调用 Python 版启动器的 `--stop`。
+  - 如果显式传入 `-UseLauncherExe`，才会调用 exe 的 `--stop`。
+  - 如果显式传入 `-PythonOverride`，则使用指定 Python 调用启动器的 `--stop`。
   - 调用 exe 或 Python 版启动器的 `--stop` 模式，关闭当前前端进程。
 
 - `build_go_xiexin.ps1`
@@ -34,19 +36,26 @@
 
 日常启动链路：
 
-`start_frontend_silent.ps1` -> `Go_XIEXin.exe` 或 `Go_XIEXin.py` -> `Gateway/Front/app.py`
+`start_frontend_silent.ps1` -> `Go_XIEXin.py` -> `orchestrator.py --serve` + `Gateway/Front/react-ui`
+
+兼容参数：
+
+- `--wechat`
+- `start_frontend_silent.ps1 -WeChat`
+
+它们现在只用于兼容旧调用方式，不再切换到单独前端入口。
 
 优先级规则：
 
-`传入 -PythonOverride` -> 强制走 `Go_XIEXin.py`
+`传入 -PythonOverride` -> 强制走指定 Python + `Go_XIEXin.py`
 
-`未传入 -PythonOverride` 且 `Go_XIEXin.exe` 存在 -> 优先走 `Go_XIEXin.exe`
+`传入 -UseLauncherExe` 且未传入 -PythonOverride 且 `Go_XIEXin.exe` 存在 -> 走 `Go_XIEXin.exe`
 
-`未传入 -PythonOverride` 且 exe 不存在 -> 回退到 `Go_XIEXin.py`
+`默认情况` -> 走 `Go_XIEXin.py`
 
 日常停止链路：
 
-`stop_frontend.ps1` -> `Go_XIEXin.exe --stop` 或 `Go_XIEXin.py --stop`
+`stop_frontend.ps1` -> `Go_XIEXin.py --stop`
 
 打包链路：
 
@@ -54,4 +63,4 @@
 
 ## 一句话理解
 
-`Go_XIEXin.py` 是源头，两个 ps1 是薄包装，`Go_XIEXin.exe` 是打包产物。
+`Go_XIEXin.py` 是源头，两个 ps1 是薄包装；它现在会同时拉起 Python 后端和 React 前端，运行期文件落在仓库根目录的 `.runtime/`，`Go_XIEXin.exe` 是其打包产物。

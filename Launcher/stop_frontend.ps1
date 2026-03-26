@@ -1,6 +1,7 @@
 param(
     [int]$Port = 8501,
-    [string]$PythonOverride = ""
+    [string]$PythonOverride = "",
+    [switch]$UseLauncherExe
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,7 +32,7 @@ function Find-Python {
     return $null
 }
 
-if ((-not $PythonOverride) -and (Test-Path $LauncherExe)) {
+if ($UseLauncherExe -and (-not $PythonOverride) -and (Test-Path $LauncherExe)) {
     & $LauncherExe --stop --port $Port
     return
 }
