@@ -26,11 +26,27 @@
   --content-width: min(1220px, calc(100vw - 52px));
   --composer-bottom: max(18px, env(safe-area-inset-bottom, 0px));
   --app-height: 100dvh;
+  --app-height-stable: 100dvh;
+  --app-width: 100vw;
+  --app-width-stable: 100vw;
   --keyboard-offset: 0px;
   --thread-scroll-gutter: 16px;
   --thread-composer-gap: 3%;
   --thread-surface-offset: calc(var(--chat-composer-height) + var(--composer-bottom) + var(--thread-composer-gap));
   --thread-content-tail-space: 4px;
+  --topbar-top: max(16px, env(safe-area-inset-top, 0px));
+  --topbar-right: 16px;
+  --welcome-mobile-top-band: clamp(92px, 17vh, 176px);
+  --welcome-mobile-bottom-band: clamp(18px, 6vh, 56px);
+  --welcome-mobile-top-flex: 1fr;
+  --welcome-mobile-bottom-flex: 0.75fr;
+  --welcome-mobile-row-gap: clamp(14px, 2.6vh, 22px);
+  --welcome-mobile-avatar-title-gap: var(--welcome-mobile-row-gap);
+  --welcome-mobile-title-composer-gap: var(--welcome-mobile-row-gap);
+  --welcome-mobile-title-size: clamp(23px, 6.6vw, 32px);
+  --welcome-mobile-composer-width: min(920px, calc(var(--app-width) - 24px));
+  --welcome-mobile-composer-height: 58px;
+  --wechat-welcome-lock-bottom: 41vh;
 }
 
 * {
@@ -44,6 +60,12 @@ body,
   min-height: 100%;
   background: var(--bg);
   margin: 0;
+}
+
+html[data-welcome-lock="true"],
+body[data-welcome-lock="true"] {
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -85,6 +107,14 @@ textarea {
   left: var(--settings-left);
   bottom: var(--settings-bottom);
   z-index: 5;
+}
+
+.topbar-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
 }
 
 .topbar-actions {
@@ -166,6 +196,22 @@ textarea {
 .settings-list {
   display: grid;
   gap: 6px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.settings-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.settings-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-list::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 999px;
 }
 
 .settings-option {
@@ -201,6 +247,13 @@ textarea {
   text-align: center;
   position: relative;
   z-index: 2;
+}
+
+.welcome-stack-shell {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .welcome-mode .hero-panel {
@@ -437,7 +490,7 @@ textarea {
 }
 
 .message-meta {
-  margin-top: 10px;
+  margin-top: 5px;
   font-size: 11px;
   color: var(--muted);
 }
@@ -536,6 +589,9 @@ textarea {
 }
 
 .composer-box textarea::placeholder {
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: 0;
   color: #b5b5b5;
 }
 
@@ -609,11 +665,11 @@ textarea {
 
 @media (max-width: 900px) {
   :root {
-    --content-width: calc(100vw - 24px);
+    --content-width: calc(var(--app-width) - 24px);
     --composer-bottom: max(14px, env(safe-area-inset-bottom, 0px));
     --welcome-stack-gap: 2vh;
     --welcome-title-composer-gap: 4vh;
-    --welcome-stack-shift: 6vh;
+    --welcome-stack-shift: 0px;
     --welcome-top-offset: 6vh;
     --settings-column-left: 12px;
     --settings-toggle-size: 48px;
@@ -624,15 +680,99 @@ textarea {
     --thread-scroll-gutter: 14px;
     --thread-surface-offset: calc(var(--chat-composer-height) + var(--composer-bottom) + var(--thread-composer-gap));
     --thread-content-tail-space: 6px;
+    --topbar-top: max(12px, calc(env(safe-area-inset-top, 0px) + 4px));
+    --topbar-right: 12px;
   }
 
   .app-shell {
     padding: 12px;
   }
 
+  .app-shell.welcome-mode {
+    min-height: var(--app-height);
+    height: var(--app-height);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(var(--welcome-mobile-top-band), var(--welcome-mobile-top-flex)) auto auto minmax(var(--welcome-mobile-bottom-band), var(--welcome-mobile-bottom-flex));
+    justify-items: center;
+    align-content: stretch;
+    row-gap: 0;
+    padding-top: 0;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-shell.is-wechat {
+    --welcome-mobile-top-band: clamp(0px, 0.5vh, 8px);
+    --welcome-mobile-bottom-band: clamp(180px, 31vh, 280px);
+    --welcome-mobile-top-flex: 0.42fr;
+    --welcome-mobile-bottom-flex: 1.58fr;
+    --welcome-mobile-row-gap: clamp(16px, 4vw, 22px);
+    --welcome-mobile-avatar-title-gap: clamp(10px, 3vw, 16px);
+    --welcome-mobile-title-composer-gap: clamp(14px, 3.6vw, 22px);
+    --welcome-mobile-title-size: clamp(16px, 4.2vw, 20px);
+    --welcome-mobile-composer-width: min(940px, calc(var(--app-width-stable) - 20px));
+    --welcome-mobile-composer-height: 58px;
+  }
+
+  .app-shell.is-wechat.welcome-mode {
+    position: fixed;
+    inset: 0;
+    min-height: var(--app-height-stable);
+    height: var(--app-height-stable);
+    display: block;
+    overflow: hidden;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .app-shell.is-wechat.welcome-mode .welcome-stack-shell {
+    position: absolute;
+    left: 50%;
+    bottom: var(--wechat-welcome-lock-bottom);
+    width: min(var(--content-width), calc(var(--app-width-stable) - 20px));
+    transform: translateX(-50%);
+    z-index: 6;
+  }
+
   .topbar {
-    left: var(--settings-left);
-    bottom: var(--settings-bottom);
+    position: fixed;
+    top: var(--topbar-top);
+    right: var(--topbar-right);
+    left: auto;
+    bottom: auto;
+    justify-content: flex-end;
+    z-index: 40;
+  }
+
+  .topbar .settings-popover {
+    top: 0;
+    right: calc(100% + 10px);
+    left: auto;
+    bottom: auto;
+  }
+
+  .app-shell.is-wechat .topbar .settings-popover {
+    width: min(182px, calc(var(--app-width-stable) - 28px));
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .app-shell.is-wechat .settings-title {
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+
+  .app-shell.is-wechat .settings-list {
+    gap: 4px;
+    max-height: 112px;
+    padding-right: 2px;
+  }
+
+  .app-shell.is-wechat .settings-option {
+    min-height: 34px;
+    padding: 0 10px;
+    border-radius: 10px;
+    font-size: 12px;
   }
 
   .settings-toggle {
@@ -645,16 +785,38 @@ textarea {
   }
 
   .welcome-mode .hero-panel {
-    transform: translateY(var(--welcome-stack-shift));
+    grid-row: 2;
+    align-self: end;
+    width: min(var(--content-width), calc(var(--app-width) - 24px));
+    gap: var(--welcome-mobile-avatar-title-gap);
+    margin: 0;
+    transform: none;
   }
 
   .hero-avatar {
-    width: 94px;
-    height: 94px;
+    width: clamp(88px, 24vw, 108px);
+    height: clamp(88px, 24vw, 108px);
   }
 
   .hero-title {
-    font-size: 17px;
+    font-size: var(--welcome-mobile-title-size);
+    line-height: 1.14;
+  }
+
+  .app-shell.is-wechat .hero-title {
+    max-width: none;
+    white-space: nowrap;
+    letter-spacing: -0.02em;
+  }
+
+  .app-shell.is-wechat.welcome-mode .hero-panel {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    width: 100%;
+    margin: 0;
+    transform: none;
+    z-index: 6;
   }
 
   .chat-stage {
@@ -678,12 +840,10 @@ textarea {
   }
 
   .chat-mode .topbar {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    z-index: 5;
-    padding: 0 2px;
+    padding: 0;
+    left: var(--thread-scroll-gutter);
+    right: var(--thread-scroll-gutter);
+    justify-content: space-between;
   }
 
   .chat-mode .chat-stage {
@@ -708,6 +868,13 @@ textarea {
     font-size: 14px;
   }
 
+  .app-shell.is-wechat .message-bubble {
+    max-width: 86%;
+    padding: 12px 14px;
+    border-radius: 18px;
+    font-size: 13px;
+  }
+
   .message-row.assistant .message-bubble,
   .message-row.assistant .message-content {
     max-height: none;
@@ -724,9 +891,95 @@ textarea {
   }
 
   .welcome-mode .composer-shell {
-    width: calc(100vw - 24px);
-    margin-top: calc(var(--welcome-title-composer-gap) - var(--welcome-stack-gap));
-    transform: translateY(var(--welcome-stack-shift));
+    grid-row: 3;
+    align-self: start;
+    width: var(--welcome-mobile-composer-width);
+    margin-top: var(--welcome-mobile-title-composer-gap);
+    transform: none;
+  }
+
+  .app-shell.is-wechat.welcome-mode .composer-shell {
+    position: static;
+    left: auto;
+    bottom: auto;
+    width: var(--welcome-mobile-composer-width);
+    margin-top: var(--welcome-mobile-title-composer-gap);
+    transform: none;
+    z-index: 6;
+  }
+
+  .app-shell.is-wechat .hero-avatar {
+    width: clamp(82px, 21vw, 96px);
+    height: clamp(82px, 21vw, 96px);
+  }
+
+  .app-shell.is-wechat .composer-box {
+    min-height: 58px;
+    padding: 6px 1.7%;
+    gap: 8px;
+    border-radius: 26px;
+  }
+
+  .app-shell.is-wechat .composer-model {
+    max-width: 132px;
+    padding: 6px 10px;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .app-shell.is-wechat .message-meta {
+    margin-top: 3px;
+    font-size: 9px;
+  }
+
+  .app-shell.is-wechat.chat-mode .message-bubble {
+    max-width: 86%;
+    padding: 10px 12px;
+    border-radius: 16px;
+    font-size: 10.5px;
+  }
+
+  .app-shell.is-wechat.chat-mode .message-content {
+    line-height: 1.5;
+    letter-spacing: -0.015em;
+  }
+
+  .app-shell.is-wechat.chat-mode .message-meta {
+    margin-top: 2px;
+    font-size: 7.2px;
+    letter-spacing: -0.01em;
+  }
+
+  .app-shell.is-wechat.chat-mode .composer-model {
+    font-size: 8px;
+    letter-spacing: 0.01em;
+  }
+
+  .app-shell.is-wechat.chat-mode .composer-box textarea {
+    font-size: 13px;
+    letter-spacing: -0.01em;
+  }
+
+  .app-shell.is-wechat .composer-box textarea {
+    font-size: 16px;
+  }
+
+  .app-shell.is-wechat .composer-box textarea::placeholder {
+    font-size: inherit;
+    line-height: inherit;
+    letter-spacing: 0;
+  }
+
+  .app-shell.is-wechat.chat-mode .composer-box textarea::placeholder {
+    font-size: 10.4px;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+  }
+
+  .app-shell.is-wechat .send-button {
+    width: 42px;
+    height: 42px;
+    font-size: 18px;
   }
 
   .composer-box {

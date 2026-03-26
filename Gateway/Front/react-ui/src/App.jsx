@@ -5,6 +5,26 @@ const API_PORT = 8765;
 const STREAM_PATH = "/api/chat/stream";
 const CONFIG_PATH = "/api/frontend-config";
 
+function readForcedClientMode() {
+  const params = new URLSearchParams(window.location.search);
+  const requested = (params.get("client") || params.get("mode") || "").trim().toLowerCase();
+  return requested === "wechat" || requested === "weixin" ? "wechat" : "default";
+}
+
+function isWeChatEnvironment() {
+  const userAgent = navigator.userAgent.toLowerCase();
+  return userAgent.includes("micromessenger") || window.__wxjs_environment === "miniprogram";
+}
+
+function resolveClientMode() {
+  const globalMode = (window.__APP_CLIENT_MODE || "").trim().toLowerCase();
+  if (globalMode === "wechat" || globalMode === "weixin") return "wechat";
+
+  const forcedMode = readForcedClientMode();
+  if (forcedMode !== "default") return forcedMode;
+  return isWeChatEnvironment() ? "wechat" : "default";
+}
+
 function resolveApiBase() {
   const { protocol, hostname } = window.location;
   const safeProtocol = protocol === "https:" ? "https:" : "http:";
@@ -73,6 +93,7 @@ function MessageBubble({ message }) {
 }
 
 export default function App() {
+  const [clientMode] = useState(() => resolveClientMode());
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -88,6 +109,9 @@ export default function App() {
   const textareaRef = useRef(null);
   const headerSettingsRef = useRef(null);
   const railSettingsRef = useRef(null);
+  const stableViewportHeightRef = useRef(0);
+  const stableViewportWidthRef = useRef(0);
+  const wechatWelcomeLockRef = useRef(null);
   const apiBase = resolveApiBase();
 
   function getPreferredSettingsAnchor() {
@@ -104,10 +128,33 @@ export default function App() {
 
     function syncViewportMetrics() {
       const viewport = window.visualViewport;
-      const viewportHeight = viewport?.height || window.innerHeight;
+      const viewportHeight = Math.round(viewport?.height || window.innerHeight);
+      const viewportWidth = Math.round(window.innerWidth);
+      const observedViewportWidth = Math.round(viewport?.width || viewportWidth);
       const keyboardOffset = Math.max(0, window.innerHeight - viewportHeight - (viewport?.offsetTop || 0));
+      const nextStableHeight = Math.max(stableViewportHeightRef.current || 0, viewportHeight, window.innerHeight);
+      const nextStableWidth = Math.max(stableViewportWidthRef.current || 0, observedViewportWidth, viewportWidth);
+
+      stableViewportHeightRef.current = nextStableHeight;
+      stableViewportWidthRef.current = nextStableWidth;
       root.style.setProperty("--app-height", `${viewportHeight}px`);
+      root.style.setProperty("--app-height-stable", `${nextStableHeight}px`);
+      root.style.setProperty("--app-width", `${viewportWidth}px`);
+      root.style.setProperty("--app-width-stable", `${nextStableWidth}px`);
       root.style.setProperty("--keyboard-offset", `${keyboardOffset}px`);
+
+      if (clientMode === "wechat" && !chatMode) {
+        const lockThreshold = Math.max(96, Math.round(nextStableHeight * 0.16));
+        if (keyboardOffset > lockThreshold && wechatWelcomeLockRef.current == null) {
+          wechatWelcomeLockRef.current = keyboardOffset + Math.round(nextStableHeight * 0.12);
+        }
+
+        const fallbackLock = Math.round(nextStableHeight * 0.41);
+        root.style.setProperty(
+          "--wechat-welcome-lock-bottom",
+          `${wechatWelcomeLockRef.current ?? fallbackLock}px`,
+        );
+      }
     }
 
     syncViewportMetrics();
@@ -120,7 +167,29 @@ export default function App() {
       window.visualViewport?.removeEventListener("resize", syncViewportMetrics);
       window.visualViewport?.removeEventListener("scroll", syncViewportMetrics);
     };
-  }, []);
+  }, [chatMode, clientMode]);
+
+  useEffect(() => {
+    document.documentElement.dataset.clientMode = clientMode;
+    document.body.dataset.clientMode = clientMode;
+
+    return () => {
+      delete document.documentElement.dataset.clientMode;
+      delete document.body.dataset.clientMode;
+    };
+  }, [clientMode]);
+
+  useEffect(() => {
+    const welcomeLockActive = clientMode === "wechat" && !chatMode;
+
+    document.documentElement.dataset.welcomeLock = welcomeLockActive ? "true" : "false";
+    document.body.dataset.welcomeLock = welcomeLockActive ? "true" : "false";
+
+    return () => {
+      delete document.documentElement.dataset.welcomeLock;
+      delete document.body.dataset.welcomeLock;
+    };
+  }, [chatMode, clientMode]);
 
   useEffect(() => {
     let active = true;
@@ -173,14 +242,27 @@ export default function App() {
   }, [input]);
 
   useEffect(() => {
-    if (!configReady || loading || settingsOpen) return undefined;
+    if (!(clientMode === "wechat" && !chatMode)) return undefined;
 
-    const frame = requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-    });
+    function lockWindowScroll() {
+      if (window.scrollX !== 0 || window.scrollY !== 0) {
+        window.scrollTo(0, 0);
+      }
+    }
 
-    return () => window.cancelAnimationFrame(frame);
-  }, [configReady, loading, settingsOpen]);
+    function handleViewportShift() {
+      requestAnimationFrame(lockWindowScroll);
+    }
+
+    lockWindowScroll();
+    window.addEventListener("scroll", lockWindowScroll, { passive: true });
+    window.visualViewport?.addEventListener("scroll", handleViewportShift);
+
+    return () => {
+      window.removeEventListener("scroll", lockWindowScroll);
+      window.visualViewport?.removeEventListener("scroll", handleViewportShift);
+    };
+  }, [chatMode, clientMode]);
 
   useEffect(() => {
     if (!settingsOpen) return undefined;
@@ -400,18 +482,42 @@ export default function App() {
   }
 
   return (
-    <div className={`app-shell ${chatMode ? "chat-mode" : "welcome-mode"}`}>
+    <div className={`app-shell is-${clientMode} ${chatMode ? "chat-mode" : "welcome-mode"}`}>
       <header className="topbar">
+        {chatMode ? <img className="topbar-avatar" src="/xiexin-avatar.png" alt="鑫哥头像" /> : null}
         {renderSettingsControl("header")}
       </header>
 
       {!chatMode ? (
-        <section className="hero-panel">
-          <img className="hero-avatar" src="/xiexin-avatar.png" alt="鑫哥头像" />
-          <div className="hero-copy">
-            <h1 className="hero-title">{statusText}</h1>
-          </div>
-        </section>
+        <div className="welcome-stack-shell">
+          <section className="hero-panel">
+            <img className="hero-avatar" src="/xiexin-avatar.png" alt="鑫哥头像" />
+            <div className="hero-copy">
+              <h1 className="hero-title">{statusText}</h1>
+            </div>
+          </section>
+
+          <form className="composer-shell" onSubmit={handleSubmit}>
+            <div className={`composer-box ${input.trim() ? "has-text" : "is-empty"}`}>
+              <div className="composer-leading">
+                <div className="composer-model">{selectedModel || "model"}</div>
+              </div>
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                placeholder="Ask anything"
+                disabled={!configReady || loading}
+                autoFocus={!chatMode}
+              />
+              <button type="submit" className="send-button" disabled={!configReady || loading}>
+                {loading ? "..." : "➤"}
+              </button>
+            </div>
+          </form>
+        </div>
       ) : null}
 
       <main className="chat-stage">
@@ -428,26 +534,28 @@ export default function App() {
         </section>
       </main>
 
-      <form className="composer-shell" onSubmit={handleSubmit}>
-        <div className={`composer-box ${input.trim() ? "has-text" : "is-empty"}`}>
-          <div className="composer-leading">
-            <div className="composer-model">{selectedModel || "model"}</div>
+      {chatMode ? (
+        <form className="composer-shell" onSubmit={handleSubmit}>
+          <div className={`composer-box ${input.trim() ? "has-text" : "is-empty"}`}>
+            <div className="composer-leading">
+              <div className="composer-model">{selectedModel || "model"}</div>
+            </div>
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={handleComposerKeyDown}
+              placeholder="Ask anything"
+              disabled={!configReady || loading}
+              autoFocus={!chatMode}
+            />
+            <button type="submit" className="send-button" disabled={!configReady || loading}>
+              {loading ? "..." : "➤"}
+            </button>
           </div>
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={handleComposerKeyDown}
-            placeholder="Ask anything"
-            disabled={!configReady || loading}
-            autoFocus
-          />
-          <button type="submit" className="send-button" disabled={!configReady || loading}>
-            {loading ? "..." : "➤"}
-          </button>
-        </div>
-      </form>
+        </form>
+      ) : null}
     </div>
   );
 }
