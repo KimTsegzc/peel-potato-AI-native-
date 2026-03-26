@@ -4,7 +4,7 @@ import base64
 import streamlit as st
 import streamlit.components.v1 as components
 
-from controller import ensure_stream_server_running
+from orchestrator import ensure_stream_server_running
 
 BASE_DIR = Path(__file__).parent
 UI_DIR = BASE_DIR / "ui"

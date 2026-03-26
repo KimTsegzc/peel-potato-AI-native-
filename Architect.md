@@ -1,4 +1,4 @@
-**This is a human write file(./architect.md) to make things controllable.**
+**This is a human write file './architect.md' to make things controllable.**
 **AI agents should read to understand.**
 **No AI should/could/would make any change.**
 
@@ -6,32 +6,36 @@
 # This is md file that claims ways of building whole project.
 # a vission and scope statement is at ./readme.md.
 
-<!-- Directories -->
-# Directories
-It has:
-1. **Memo:** contains ./Memo/metadata, some metadata like Dict.json a mapping for columns to select and rename. and other groups xlsx may be packed up here.
-2. **Skills:** ./Skills/sudo-name-skill kebab-case named skill folders, with a .md file to anounce it which has name same as skill(constraint with JSON Schema for input and output),  a scripts, an input and a output foder inside.
-3. **Gateway:** has ./Gateway/LLM provides LLM service. ./Gateway/Front as UI page.
-4. **controller.py** main controlling process, **Human built, AI can read but never make any change**.
-
-
 <!-- FRONTEND -->
 # Frontend Architect
 ## main and only page
-Let's make this a chatbot-like UI.
+Let's make this a chatbot-like UI. an './Gateway/Front/app.py' would make it.
 
 ## style and reference
 - **farmework:** Streamlit
 - **Style:** Conversational UI/UX
 - **UI Reference:** 
     - [ChatGPT](https://chatgpt.com/)
-    - there is a wanted page look at '.\Gateway\Front\page_referencee.png'
-    - the avatar pic is at '.\Gateway\Front\xiexin-avatar.png'
+    - there is a wanted page look at './Gateway/Front/page_referencee.png'
+    - the avatar pic is at './Gateway/Front/xiexin-avatar.png'
 
-## Interactive Components
-- [comp-chat-box]an input box for type and send.
-- nothing else for right now!
+## Openup
+'我是鑫哥，帮你搞搞数据' would be on the page, with an avatar.
+line would 'streaming' out like a talktive greeting.
+a 'ask anything' bar like [ChatGPT] would be under it.
+that's it, simple and easy.
+
+<!-- INTERACTIVES -->
+## Interactive
+**This is important! it gives event connected Front-end and Back-end.**
+- [send]a send button(clickable), by default shortcut 'enter'. it wraps up the input with prefix 'user: ', then send it to ./orchestrator.py for a ask.
+
 
 <!-- BACKEND -->
 # Backend Architect
-We'll discuss this later.<video controls src="Screen Recording 2026-03-25 155814.mp4" title="Title"></video>
+## We use an agentic way of working:
+- **./orchestrator.py:** Do the 'Brain' work.
+    1. it receives info from different components, and let the logic runs through.
+    2. it's also human write only, no LLM hallucination would affect the main logic.
+- **./Gateway/Back:** provides funtion to call.
+    1. LLM-provider.py with a LLM-provider-function.md.
