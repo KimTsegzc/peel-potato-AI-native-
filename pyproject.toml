@@ -4,10 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "xiexin-da-agent"
-version = "2.4.1"
+version = "4.0.0"
 requires-python = ">=3.11"
 dependencies = [
-    "streamlit>=1.37,<2.0",
     "openai>=1.14,<2.0",
     "pydantic-settings>=2.0",
     "python-dotenv>=1.0",
@@ -23,4 +22,3 @@ packages = ["Gateway"]
 [tool.hatch.envs.default.scripts]
 back-llm-provider = "python -m Gateway.Back.llm_provider"
 back-ali-test = "python -m Gateway.Back.ali_test"
-front-ui = "streamlit run Gateway/Front/app.py"
