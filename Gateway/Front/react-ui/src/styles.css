@@ -19,20 +19,21 @@
   --chat-rail-gap: 28px;
   --settings-column-left: max(16px, calc((100vw - var(--content-width)) / 2));
   --settings-toggle-size: 56px;
+  --settings-toggle-radius: 14px;
   --chat-composer-height: 68px;
   --settings-left: calc(var(--settings-column-left) + (var(--chat-rail-width) - var(--settings-toggle-size)) / 2);
   --settings-bottom: calc(var(--composer-bottom) + var(--keyboard-offset) + (var(--chat-composer-height) - var(--settings-toggle-size)) / 2);
   --chat-rail-top: 44px;
   --content-width: min(1220px, calc(100vw - 52px));
   --composer-bottom: max(18px, env(safe-area-inset-bottom, 0px));
-  --app-height: 100dvh;
-  --app-height-stable: 100dvh;
+  --app-height: 100vh;
+  --app-height-stable: 100vh;
   --app-width: 100vw;
   --app-width-stable: 100vw;
   --keyboard-offset: 0px;
   --thread-scroll-gutter: 16px;
-  --thread-composer-gap: 3%;
-  --thread-surface-offset: calc(var(--chat-composer-height) + var(--composer-bottom) + var(--thread-composer-gap));
+  --thread-composer-gap: 2%;
+  --thread-surface-offset: calc(var(--chat-composer-height) + var(--composer-bottom) + 6px);
   --thread-content-tail-space: 4px;
   --topbar-top: max(16px, env(safe-area-inset-top, 0px));
   --topbar-right: 16px;
@@ -75,9 +76,11 @@ html,
 body,
 #root {
   width: 100%;
-  min-height: 100%;
+  min-height: var(--app-height);
+  height: var(--app-height);
   background: var(--bg);
   margin: 0;
+  overscroll-behavior-y: none;
 }
 
 html[data-welcome-lock="true"],
@@ -183,19 +186,61 @@ textarea {
   z-index: 24;
 }
 
-.settings-toggle {
+.settings-toggle,
+.newchat-toggle {
   width: var(--settings-toggle-size);
   height: var(--settings-toggle-size);
   border: var(--line-width) solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--settings-toggle-radius);
   background: #ffffff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   position: relative;
   cursor: pointer;
+  overflow: hidden;
   box-shadow: var(--shadow-card);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.newchat-toggle {
+  position: absolute;
+  left: 0;
+  padding: 0;
+  z-index: 27;
+}
+
+.app-shell.is-wechat .newchat-toggle,
+.app-shell.is-mobile-default .newchat-toggle {
+  border-radius: calc(var(--settings-toggle-radius) - 1px);
+}
+
+.newchat-toggle.is-above {
+  bottom: calc(100% + 8px);
+}
+
+.newchat-toggle.is-below {
+  top: calc(100% + 8px);
+}
+
+.newchat-toggle svg {
+  width: 24px;
+  height: 24px;
+  stroke: #111111;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.app-shell.is-wechat .newchat-toggle.is-above,
+.app-shell.is-mobile-default .newchat-toggle.is-above {
+  bottom: calc(100% + 8px);
+}
+
+.app-shell.is-wechat .newchat-toggle.is-below,
+.app-shell.is-mobile-default .newchat-toggle.is-below {
+  top: calc(100% + 8px);
 }
 
 .settings-toggle span {
@@ -233,7 +278,7 @@ textarea {
 
 .settings-popover {
   position: absolute;
-  bottom: calc(100% + 12px);
+  bottom: calc(100% + 8px);
   left: 0;
   width: min(220px, calc(100vw - 48px));
   padding: 12px;
@@ -256,7 +301,7 @@ textarea {
 
 .settings-list {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #d1d5db transparent;
@@ -415,6 +460,8 @@ textarea {
   padding: 20px var(--thread-scroll-gutter) var(--thread-content-tail-space) 8px;
   overflow-y: auto;
   overflow-x: visible;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: #d1d5db transparent;
@@ -463,7 +510,7 @@ textarea {
   border-radius: 24px;
   background: var(--surface-strong);
   border: 1px solid var(--line);
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035), 0 1px 2px rgba(15, 23, 42, 0.02);
 }
 
 .message-row.user .message-bubble {
@@ -557,11 +604,12 @@ textarea {
 .composer-shell {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--composer-bottom) + var(--keyboard-offset));
+  bottom: var(--composer-bottom);
   width: min(1260px, calc(100vw - 32px));
   transform: translateX(-50%);
   z-index: 4;
-  transition: bottom 0.2s ease, top 0.2s ease, transform 0.2s ease, width 0.2s ease;
+  max-height: calc(var(--app-height) - 20px);
+  transition: width 0.2s ease;
 }
 
 .chat-mode .composer-shell {
@@ -694,7 +742,7 @@ textarea {
 
   .chat-mode .chat-surface {
     min-height: 0;
-    height: 100%;
+    height: calc(100% - 2%);
     max-height: none;
     overflow-y: auto;
     overflow-x: hidden;
@@ -703,7 +751,7 @@ textarea {
 
   .settings-popover {
     position: fixed;
-    left: calc(var(--settings-left) + var(--settings-toggle-size) + 12px);
+    left: calc(var(--settings-left) + var(--settings-toggle-size) + 8px);
     bottom: calc(var(--settings-bottom) - 10px);
     z-index: 40;
   }
@@ -734,13 +782,14 @@ textarea {
     --welcome-top-offset: 6vh;
     --settings-column-left: 12px;
     --settings-toggle-size: 48px;
+    --settings-toggle-radius: 12px;
     --chat-composer-height: 62px;
     --settings-left: calc(var(--settings-column-left) + (var(--chat-rail-width) - var(--settings-toggle-size)) / 2);
     --settings-bottom: calc(var(--composer-bottom) + var(--keyboard-offset) + (var(--chat-composer-height) - var(--settings-toggle-size)) / 2);
     --chat-rail-top: 18px;
     --thread-scroll-gutter: 14px;
     --thread-composer-gap: 8px;
-    --thread-surface-offset: calc(var(--chat-composer-height) + var(--composer-bottom) + var(--thread-composer-gap));
+    --thread-surface-offset: calc(var(--chat-composer-height) + var(--composer-bottom) + 6px);
     --thread-content-tail-space: 6px;
     --topbar-top: max(12px, calc(env(safe-area-inset-top, 0px) + 4px));
     --topbar-right: 12px;
@@ -862,6 +911,17 @@ textarea {
     justify-content: flex-start;
   }
 
+  .app-shell.is-wechat.welcome-mode .topbar,
+  .app-shell.is-mobile-default.welcome-mode .topbar {
+    position: absolute;
+    top: var(--topbar-top);
+    left: 50%;
+    right: auto;
+    width: calc(100vw - 24px);
+    transform: translateX(-50%);
+    justify-content: flex-start;
+  }
+
   .app-shell.is-mobile-default .topbar {
     top: max(14px, calc(env(safe-area-inset-top, 0px) + 6px));
   }
@@ -902,8 +962,8 @@ textarea {
 
   .app-shell.is-wechat .settings-list,
   .app-shell.is-mobile-default .settings-list {
-    gap: 4px;
-    max-height: 112px;
+    gap: 8px;
+    max-height: 120px;
     padding-right: 1%;
   }
 
@@ -919,10 +979,6 @@ textarea {
 
   .app-shell.is-mobile-default .settings-option {
     width: 96%;
-  }
-
-  .settings-toggle {
-    border-radius: 12px;
   }
 
   .hero-panel {
@@ -983,7 +1039,7 @@ textarea {
 
   .chat-surface {
     min-height: 0;
-    max-height: calc(var(--app-height) - 156px - var(--thread-surface-offset) - env(safe-area-inset-bottom, 0px));
+    max-height: calc(var(--app-height) - var(--thread-surface-offset) - 88px);
     padding: 8px var(--thread-scroll-gutter) var(--thread-content-tail-space) 0;
   }
 
@@ -1007,7 +1063,7 @@ textarea {
     position: absolute;
     left: 0;
     right: 0;
-    top: 60px;
+    top: calc(60px + 1%);
     bottom: var(--thread-surface-offset);
     max-height: none;
     padding: 12px var(--thread-scroll-gutter) var(--thread-content-tail-space) 2px;
@@ -1018,14 +1074,14 @@ textarea {
     --chat-composer-height: 46px;
     position: fixed;
     inset: 0;
-    min-height: var(--app-height);
-    height: var(--app-height);
+    min-height: var(--app-height-stable);
+    height: var(--app-height-stable);
     overflow: hidden;
   }
 
   .app-shell.is-mobile-default.chat-mode .chat-stage {
     margin-top: 0;
-    min-height: calc(var(--app-height) - 8px);
+    min-height: calc(var(--app-height-stable) - 8px);
   }
 
   .app-shell.is-wechat.chat-mode .topbar-avatar,
@@ -1034,12 +1090,19 @@ textarea {
     height: 55px;
   }
 
+  .app-shell.is-wechat.chat-mode .composer-shell,
   .app-shell.is-mobile-default.chat-mode .composer-shell {
-    bottom: var(--composer-bottom);
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: calc(var(--keyboard-offset) + var(--composer-bottom));
+    width: auto;
+    transform: none;
+    transition: none;
   }
 
   .app-shell.is-mobile-default.chat-mode .chat-surface {
-    bottom: calc(var(--chat-composer-height) + var(--composer-bottom) + 6px);
+    bottom: calc(var(--keyboard-offset) + var(--chat-composer-height) + var(--composer-bottom) + 6px);
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
@@ -1064,15 +1127,20 @@ textarea {
   .app-shell.is-wechat.chat-mode .chat-stage,
   .app-shell.is-mobile-default.chat-mode .chat-stage {
     margin-top: 0;
-    min-height: calc(var(--app-height) - 8px);
+    min-height: var(--app-height-stable);
   }
 
   .app-shell.is-wechat.chat-mode .chat-surface,
   .app-shell.is-mobile-default.chat-mode .chat-surface {
-    top: 54px;
-    bottom: calc(var(--chat-composer-height) + var(--composer-bottom) + 6px);
+    top: calc(54px + 1%);
+    bottom: calc(var(--keyboard-offset) + var(--thread-surface-offset));
     padding-right: 12px;
-    padding-bottom: calc(var(--thread-content-tail-space) + 8px);
+    padding-bottom: 0;
+  }
+
+  .app-shell.is-wechat.chat-mode .message-row:last-child,
+  .app-shell.is-mobile-default.chat-mode .message-row:last-child {
+    margin-bottom: 6px;
   }
 
   .message-bubble {
@@ -1170,6 +1238,12 @@ textarea {
     height: clamp(82px, 21vw, 96px);
   }
 
+  .app-shell.is-wechat.welcome-mode .hero-avatar,
+  .app-shell.is-mobile-default.welcome-mode .hero-avatar {
+    width: clamp(123px, 31.5vw, 144px);
+    height: clamp(123px, 31.5vw, 144px);
+  }
+
   .app-shell.is-wechat .composer-box,
   .app-shell.is-mobile-default .composer-box {
     min-height: 58px;
@@ -1262,13 +1336,6 @@ textarea {
     font-size: 15.6px;
   }
 
-  .app-shell.is-wechat.chat-mode .composer-shell,
-  .app-shell.is-mobile-default.chat-mode .composer-shell {
-    left: 50%;
-    width: calc(100vw - 24px);
-    transform: translateX(-50%);
-  }
-
   .app-shell.is-wechat.chat-mode .composer-box,
   .app-shell.is-mobile-default.chat-mode .composer-box {
     min-height: 46px;
@@ -1279,7 +1346,7 @@ textarea {
 
   .app-shell.is-wechat.chat-mode .composer-box textarea,
   .app-shell.is-mobile-default.chat-mode .composer-box textarea {
-    font-size: var(--mobile-input-chat-size);
+    font-size: var(--mobile-message-chat-size);
     letter-spacing: -0.01em;
     min-height: 20px;
     line-height: 1.35;
@@ -1301,8 +1368,8 @@ textarea {
 
   .app-shell.is-wechat.chat-mode .composer-box textarea::placeholder,
   .app-shell.is-mobile-default.chat-mode .composer-box textarea::placeholder {
-    font-size: var(--mobile-input-chat-placeholder-size);
-    line-height: 1.4;
+    font-size: var(--mobile-message-chat-size);
+    line-height: 1.35;
     letter-spacing: -0.01em;
   }
 

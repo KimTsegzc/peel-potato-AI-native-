@@ -10,16 +10,22 @@
 
 ```text
 Gateway/Front/
-├─ react-ui/                 # React + Vite 主前端
+├─ react-ui/                          # React + Vite 主前端
 │  ├─ src/
-│  │  ├─ App.jsx             # 主要页面逻辑（状态、交互、接口、端逻辑）
-│  │  ├─ styles.css          # 全量布局与多端样式策略
-│  │  └─ main.jsx            # React 入口
-│  ├─ public/                # 静态资源（头像、交互视频等）
-│  ├─ wechat/index.html      # 微信入口（注入 __APP_CLIENT_MODE=wechat）
-│  ├─ index.html             # 默认入口
-│  └─ vite.config.js         # 双入口构建（main + wechat）
-└─ reference/                # 设计/参考素材
+│  │  ├─ App.jsx                      # 高层调度器：按 desktop/mobile-default/wechat 分发壳层
+│  │  ├─ styles.css                   # 当前全量样式入口（后续继续拆层）
+│  │  ├─ main.jsx                     # React 入口
+│  │  └─ app/
+│  │     ├─ constants.js              # 共享常量
+│  │     ├─ utils/                    # clientMode / api / markdown 等基础能力
+│  │     ├─ hooks/                    # viewport、键盘、配置、流式会话、热键等运行时 hooks
+│  │     ├─ components/               # Composer / MessageBubble / Settings / Avatar / Welcome / ChatStage
+│  │     └─ shells/                   # DesktopShell / MobileShell / WechatShell
+│  ├─ public/                         # 静态资源（头像、交互视频等）
+│  ├─ wechat/index.html               # 微信入口（注入 __APP_CLIENT_MODE=wechat）
+│  ├─ index.html                      # 默认入口
+│  └─ vite.config.js                  # 双入口构建（main + wechat）
+└─ reference/                         # 设计/参考素材
 ```
 
 ## 2. 运行架构（Front 在系统中的位置）
@@ -40,7 +46,7 @@ Gateway/Front/
 
 ## 3. 页面基础布局
 
-`App.jsx` 的核心是两态切换：
+现在前端不再把所有逻辑堆在一个组件里，而是按“调度器 + 壳层 + 共享组件”组织。页面核心仍然是两态切换：
 
 1. 欢迎态（`welcome-mode`）
 - 中央头像 + 打字式标题文案
@@ -59,7 +65,7 @@ Gateway/Front/
 
 ## 4. 几个端的逻辑（模式分流）
 
-前端模式判定在 `App.jsx`：
+前端模式判定仍由 `App.jsx` 统一完成，但渲染已经下沉到不同壳层：
 
 1. 微信强制入口
 - `react-ui/wechat/index.html` 注入：`window.__APP_CLIENT_MODE = "wechat"`
@@ -79,6 +85,14 @@ Gateway/Front/
 - 微信：`is-wechat` 路径
 - 非微信但移动端：`is-mobile-default`，行为与微信端对齐（含键盘处理策略）
 
+当前壳层职责：
+- `DesktopShell`：保留桌面欢迎态 / 聊天态结构，聊天态展示左侧 rail
+- `MobileShell`：移动默认端壳层，不再共享桌面 rail 结构
+- `WechatShell`：微信独立壳层，复用移动端运行时但保留显式入口
+- `ExperienceShell`：共享欢迎态、聊天区、输入区拼装逻辑
+
+这样做的目的不是立刻改视觉，而是先让移动端和桌面端停止继续在一个大组件里互相牵连。
+
 ## 5. 输入法弹起问题：控制机制详解
 
 这是当前前端最关键的一块。
@@ -95,7 +109,7 @@ Gateway/Front/
 
 #### A. 维护动态 viewport 变量
 
-在 `App.jsx` 中监听：
+现在这部分逻辑已经抽到 `src/app/hooks/useViewportMetrics.js` 中统一监听：
 - `window.resize`
 - `visualViewport.resize`
 - `visualViewport.scroll`
@@ -131,7 +145,7 @@ Gateway/Front/
 
 #### D. 强制回滚页面滚动
 
-欢迎态锁定时会监听 `scroll` + `visualViewport.scroll`，并通过 `window.scrollTo(0, 0)` 维持页面不被拖偏。
+欢迎态锁定与页面回滚逻辑现在由 `src/app/hooks/useAppScrollLock.js` 负责，通过 `scroll` + `visualViewport.scroll` + `focusin` 维持页面不被拖偏。
 
 #### E. 禁止移动欢迎态自动聚焦
 
@@ -182,7 +196,11 @@ POST /api/chat/stream
 - `done`：最终文本和 metrics
 - `error`：错误事件
 
-前端在 `App.jsx` 中按事件实时拼接 assistant 内容，并展示首 token 和总耗时。
+前端现在在 `src/app/hooks/useChatSession.js` 中按事件实时拼接 assistant 内容，并展示首 token 和总耗时。
+
+新增能力：
+- 会话消息会写入 `localStorage`，默认保留最近一段历史，移动端刷新后不会直接丢失上下文
+- 流式会话、配置获取、markdown 渲染都已从页面组件抽成独立模块，后续移动端优化不应再回填到 `App.jsx`
 
 ## 8. 本地开发
 
@@ -220,4 +238,7 @@ npm run dev
 
 ---
 
-维护建议：后续所有“移动端体验”改动，优先在 `is-wechat` 与 `is-mobile-default` 共用层改 token；只有明确需要差异化时，再拆分独立规则。
+维护建议：
+- 后续所有“移动端体验”改动，优先在 `is-wechat` 与 `is-mobile-default` 共用层改 token；只有明确需要差异化时，再拆分独立规则。
+- 不要再把 viewport、键盘、流式请求、会话持久化回写到 `App.jsx`，这些应该继续留在 `src/app/hooks` 和 `src/app/utils`。
+- 如果后续引入 Vant4，仅用于移动端标准浮层、toast、loading 这类外壳控件；不要替换自定义 composer、消息线程、头像互动和滚动锁链路。
