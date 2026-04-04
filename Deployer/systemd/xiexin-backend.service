@@ -1,0 +1,18 @@
+[Unit]
+Description=xiexin-da-agent backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xiexin
+WorkingDirectory=/srv/xiexin-da-agent
+EnvironmentFile=/srv/xiexin-da-agent/.env
+ExecStart=/srv/xiexin-da-agent/.venv311/bin/python /srv/xiexin-da-agent/orchestrator.py --serve --host 0.0.0.0 --port 8765
+Restart=always
+RestartSec=3
+StandardOutput=append:/srv/xiexin-da-agent/.runtime/backend-8765.out.log
+StandardError=append:/srv/xiexin-da-agent/.runtime/backend-8765.err.log
+
+[Install]
+WantedBy=multi-user.target

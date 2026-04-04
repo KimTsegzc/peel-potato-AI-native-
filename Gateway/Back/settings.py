@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from pathlib import Path
 
@@ -20,6 +21,27 @@ AVAILABLE_MODELS: list[str] = [
 
 _SOUL_FILE = REPO_ROOT / "soul.md"
 _DEFAULT_SOUL = """你是谢鑫的数字分身。"""
+
+
+def load_legacy_runtime_config() -> dict:
+    """Load legacy runtime config from config.json when present."""
+    config_path = REPO_ROOT / "config.json"
+    if not config_path.exists():
+        return {}
+
+    try:
+        with config_path.open("r", encoding="utf-8") as fp:
+            raw = json.load(fp)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    if not isinstance(raw, dict):
+        return {}
+
+    wrapped = raw.get("llm_provider_config")
+    if isinstance(wrapped, dict):
+        return wrapped
+    return raw
 
 
 def load_system_prompt() -> str:
@@ -75,7 +97,19 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    if settings.api_key:
+        return settings
+
+    legacy = load_legacy_runtime_config()
+    if not legacy:
+        return settings
+
+    updates = {
+        key: legacy.get(key, getattr(settings, key))
+        for key in ("api_key", "base_url", "model", "temperature", "top_p", "max_tokens")
+    }
+    return settings.model_copy(update=updates)
 
 
 settings = get_settings()
