@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="$ROOT_DIR/.venv311"
 FRONTEND_DIR="$ROOT_DIR/Gateway/Front/react-ui"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+USE_DEADSNAKES="${USE_DEADSNAKES:-0}"
 
 install_node20() {
   local current_major="$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/' || echo 0)"
@@ -52,14 +53,11 @@ sudo apt-get install -y \
   software-properties-common \
   build-essential \
   python3 \
-  python3.11 \
-  python3.11-venv \
-  python3.11-dev \
   python3-venv \
   python3-pip \
   nginx
 
-if ! command -v python3.11 >/dev/null 2>&1; then
+if [[ "$USE_DEADSNAKES" == "1" ]] && ! command -v python3.11 >/dev/null 2>&1; then
   echo "[INFO] Installing Python 3.11 via deadsnakes PPA"
   if sudo add-apt-repository -y ppa:deadsnakes/ppa \
       && sudo apt-get -o Acquire::ForceIPv4=true update \
