@@ -11,6 +11,30 @@ APP_DIR="${APP_DIR:-/srv/xiexin-da-agent}"
 GIT_URL="${GIT_URL:-https://github.com/KimTsegzc/xiexin-da-agent.git}"
 BRANCH="${BRANCH:-xiexin-vite-proto}"
 
+install_node20() {
+  local current_major="$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/' || echo 0)"
+  if [[ ! "$current_major" =~ ^[0-9]+$ ]]; then
+    current_major=0
+  fi
+
+  if [[ "$current_major" -ge 20 ]] && command -v npm >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "[INFO] Preparing Node.js 20 installation"
+  dpkg --configure -a || true
+  apt-get -f install -y || true
+
+  if dpkg -s nodejs >/dev/null 2>&1 || dpkg -s npm >/dev/null 2>&1 || dpkg -s libnode-dev >/dev/null 2>&1; then
+    echo "[INFO] Removing conflicting distro Node packages"
+    apt-get remove -y nodejs npm libnode-dev nodejs-doc || true
+    apt-get autoremove -y || true
+  fi
+
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  apt-get install -y nodejs
+}
+
 if [[ "${EUID}" -ne 0 ]]; then
   echo "[ERROR] Please run as root." >&2
   exit 1
@@ -36,16 +60,7 @@ if ! command -v python3.11 >/dev/null 2>&1; then
   fi
 fi
 
-NODE_MAJOR="$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/' || echo 0)"
-if [[ ! "$NODE_MAJOR" =~ ^[0-9]+$ ]]; then
-  NODE_MAJOR=0
-fi
-
-if [[ "$NODE_MAJOR" -lt 20 ]]; then
-  echo "[INFO] Node.js < 20 detected, installing Node.js 20 from NodeSource"
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-  apt-get install -y nodejs
-fi
+install_node20
 
 PYTHON_BIN="$(command -v python3.11 || command -v python3 || true)"
 NPM_BIN="$(command -v npm || true)"

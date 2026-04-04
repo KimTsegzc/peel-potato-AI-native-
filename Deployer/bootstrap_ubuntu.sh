@@ -6,6 +6,30 @@ VENV_DIR="$ROOT_DIR/.venv311"
 FRONTEND_DIR="$ROOT_DIR/Gateway/Front/react-ui"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
+install_node20() {
+  local current_major="$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/' || echo 0)"
+  if [[ ! "$current_major" =~ ^[0-9]+$ ]]; then
+    current_major=0
+  fi
+
+  if [[ "$current_major" -ge 20 ]] && command -v npm >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "[INFO] Preparing Node.js 20 installation"
+  sudo dpkg --configure -a || true
+  sudo apt-get -f install -y || true
+
+  if dpkg -s nodejs >/dev/null 2>&1 || dpkg -s npm >/dev/null 2>&1 || dpkg -s libnode-dev >/dev/null 2>&1; then
+    echo "[INFO] Removing conflicting distro Node packages"
+    sudo apt-get remove -y nodejs npm libnode-dev nodejs-doc || true
+    sudo apt-get autoremove -y || true
+  fi
+
+  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+  sudo apt-get install -y nodejs
+}
+
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
     echo "[ERROR] Missing command: $1" >&2
@@ -52,16 +76,7 @@ if [[ -z "$PYTHON_BIN" ]]; then
   exit 1
 fi
 
-NODE_MAJOR="$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/' || echo 0)"
-if [[ ! "$NODE_MAJOR" =~ ^[0-9]+$ ]]; then
-  NODE_MAJOR=0
-fi
-
-if [[ "$NODE_MAJOR" -lt 20 ]] || ! command -v npm >/dev/null 2>&1; then
-  echo "[INFO] Installing Node.js 20 via NodeSource"
-  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-  sudo apt-get install -y nodejs
-fi
+install_node20
 
 echo "[INFO] Python version: $($PYTHON_BIN --version)"
 echo "[INFO] Node version: $(node --version)"
