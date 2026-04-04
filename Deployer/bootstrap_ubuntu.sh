@@ -6,6 +6,7 @@ VENV_DIR="$ROOT_DIR/.venv311"
 FRONTEND_DIR="$ROOT_DIR/Gateway/Front/react-ui"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 USE_DEADSNAKES="${USE_DEADSNAKES:-0}"
+SKIP_APT="${SKIP_APT:-0}"
 
 install_node20() {
   local current_major="$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/' || echo 0)"
@@ -40,24 +41,31 @@ need_cmd() {
 
 need_cmd "$PYTHON_BIN"
 need_cmd curl
-need_cmd sudo
+
+if [[ "$SKIP_APT" != "1" ]]; then
+  need_cmd sudo
+fi
 
 echo "[INFO] Root dir: $ROOT_DIR"
 
-echo "[INFO] Installing Ubuntu packages"
-sudo apt-get -o Acquire::ForceIPv4=true update
-sudo apt-get install -y \
-  git \
-  curl \
-  ca-certificates \
-  software-properties-common \
-  build-essential \
-  python3 \
-  python3-venv \
-  python3-pip \
-  nginx
+if [[ "$SKIP_APT" == "1" ]]; then
+  echo "[INFO] SKIP_APT=1, skipping apt package installation"
+else
+  echo "[INFO] Installing Ubuntu packages"
+  sudo apt-get -o Acquire::ForceIPv4=true update
+  sudo apt-get install -y \
+    git \
+    curl \
+    ca-certificates \
+    software-properties-common \
+    build-essential \
+    python3 \
+    python3-venv \
+    python3-pip \
+    nginx
+fi
 
-if [[ "$USE_DEADSNAKES" == "1" ]] && ! command -v python3.11 >/dev/null 2>&1; then
+if [[ "$SKIP_APT" != "1" ]] && [[ "$USE_DEADSNAKES" == "1" ]] && ! command -v python3.11 >/dev/null 2>&1; then
   echo "[INFO] Installing Python 3.11 via deadsnakes PPA"
   if sudo add-apt-repository -y ppa:deadsnakes/ppa \
       && sudo apt-get -o Acquire::ForceIPv4=true update \
@@ -74,7 +82,11 @@ if [[ -z "$PYTHON_BIN" ]]; then
   exit 1
 fi
 
-install_node20
+if [[ "$SKIP_APT" == "1" ]]; then
+  echo "[INFO] SKIP_APT=1, skipping Node.js installation"
+else
+  install_node20
+fi
 
 echo "[INFO] Python version: $($PYTHON_BIN --version)"
 echo "[INFO] Node version: $(node --version)"

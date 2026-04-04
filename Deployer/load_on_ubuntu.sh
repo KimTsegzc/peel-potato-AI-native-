@@ -218,7 +218,7 @@ su - "$APP_USER" -c "cd '$APP_DIR' && bash Deployer/preflight_ubuntu.sh"
 
 if should_run_bootstrap "$BOOTSTRAP_STATE_FILE" "$CURRENT_BOOTSTRAP_STATE"; then
   echo "[STEP] Bootstrap"
-  su - "$APP_USER" -c "cd '$APP_DIR' && PYTHON_BIN=$PYTHON_BIN USE_DEADSNAKES=$USE_DEADSNAKES bash Deployer/bootstrap_ubuntu.sh"
+  su - "$APP_USER" -c "cd '$APP_DIR' && PYTHON_BIN=$PYTHON_BIN USE_DEADSNAKES=$USE_DEADSNAKES SKIP_APT=1 bash Deployer/bootstrap_ubuntu.sh"
   CURRENT_BOOTSTRAP_STATE="$(compute_bootstrap_state)"
   printf '%s\n' "$CURRENT_BOOTSTRAP_STATE" > "$BOOTSTRAP_STATE_FILE"
   chown "$APP_USER:$APP_USER" "$BOOTSTRAP_STATE_FILE"
