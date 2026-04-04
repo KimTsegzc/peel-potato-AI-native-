@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage (as root):
+#   bash Deployer/load_on_ubuntu.sh
+# Optional overrides:
+#   APP_USER=xiexin APP_DIR=/srv/xiexin-da-agent BRANCH=xiexin-vite-proto bash Deployer/load_on_ubuntu.sh
+
+APP_USER="${APP_USER:-xiexin}"
+APP_DIR="${APP_DIR:-/srv/xiexin-da-agent}"
+GIT_URL="${GIT_URL:-https://github.com/KimTsegzc/xiexin-da-agent.git}"
+BRANCH="${BRANCH:-xiexin-vite-proto}"
+
+if [[ "${EUID}" -ne 0 ]]; then
+  echo "[ERROR] Please run as root." >&2
+  exit 1
+fi
+
+echo "[INFO] APP_USER=$APP_USER"
+echo "[INFO] APP_DIR=$APP_DIR"
+echo "[INFO] GIT_URL=$GIT_URL"
+echo "[INFO] BRANCH=$BRANCH"
+
+echo "[STEP] Install base packages"
+apt-get update
+apt-get install -y git curl ca-certificates sudo nginx software-properties-common python3 python3-pip
+
+if ! command -v python3.11 >/dev/null 2>&1; then
+  echo "[INFO] python3.11 not found, installing via deadsnakes PPA"
+  add-apt-repository -y ppa:deadsnakes/ppa
+  apt-get update
+  apt-get install -y python3.11 python3.11-venv python3.11-dev
+fi
+
+NODE_MAJOR="$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/' || echo 0)"
+if [[ ! "$NODE_MAJOR" =~ ^[0-9]+$ ]]; then
+  NODE_MAJOR=0
+fi
+
+if [[ "$NODE_MAJOR" -lt 20 ]]; then
+  echo "[INFO] Node.js < 20 detected, installing Node.js 20 from NodeSource"
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  apt-get install -y nodejs
+fi
+
+PYTHON_BIN="$(command -v python3.11 || true)"
+NPM_BIN="$(command -v npm || true)"
+if [[ -z "$PYTHON_BIN" ]]; then
+  echo "[ERROR] python3.11 not found after install" >&2
+  exit 1
+fi
+if [[ -z "$NPM_BIN" ]]; then
+  echo "[ERROR] npm not found after install" >&2
+  exit 1
+fi
+
+echo "[INFO] Using Python: $PYTHON_BIN ($($PYTHON_BIN --version))"
+echo "[INFO] Using Node: $(node --version)"
+echo "[INFO] Using npm: $(npm --version)"
+
+id -u "$APP_USER" >/dev/null 2>&1 || adduser --disabled-password --gecos "" "$APP_USER"
+mkdir -p /srv
+
+echo "[STEP] Clone/update repository"
+if [[ ! -d "$APP_DIR/.git" ]]; then
+  git clone -b "$BRANCH" "$GIT_URL" "$APP_DIR"
+else
+  git -C "$APP_DIR" fetch --all
+  git -C "$APP_DIR" checkout "$BRANCH"
+  git -C "$APP_DIR" pull
+fi
+
+chown -R "$APP_USER:$APP_USER" "$APP_DIR"
+
+echo "[STEP] Preflight + bootstrap"
+su - "$APP_USER" -c "cd '$APP_DIR' && bash Deployer/preflight_ubuntu.sh"
+su - "$APP_USER" -c "cd '$APP_DIR' && PYTHON_BIN=$PYTHON_BIN bash Deployer/bootstrap_ubuntu.sh"
+
+echo "[STEP] Prepare runtime dir"
+mkdir -p "$APP_DIR/.runtime"
+chown -R "$APP_USER:$APP_USER" "$APP_DIR/.runtime"
+
+echo "[STEP] Ensure .env"
+su - "$APP_USER" -c "cd '$APP_DIR' && [ -f .env ] || cp Deployer/env.production.example .env"
+if ! grep -Eq '^(ALIYUN_BAILIAN_API_KEY|DASHSCOPE_API_KEY)=' "$APP_DIR/.env"; then
+  echo "[WARN] .env has no API key yet. Edit now: nano $APP_DIR/.env"
+fi
+
+echo "[STEP] Install systemd units"
+cp "$APP_DIR/Deployer/systemd/xiexin-backend.service" /etc/systemd/system/
+cp "$APP_DIR/Deployer/systemd/xiexin-frontend.service" /etc/systemd/system/
+
+# Patch ExecStart with actual host paths
+PY_PATH="$(readlink -f "$APP_DIR/.venv311/bin/python" || true)"
+NPM_PATH="$(command -v npm || true)"
+
+if [[ -n "$PY_PATH" ]]; then
+  sed -i "s|^ExecStart=.*orchestrator.py.*|ExecStart=${PY_PATH} ${APP_DIR}/orchestrator.py --serve --host 0.0.0.0 --port 8765|" /etc/systemd/system/xiexin-backend.service
+else
+  echo "[ERROR] Python executable not found at $APP_DIR/.venv311/bin/python" >&2
+  exit 1
+fi
+
+if [[ -n "$NPM_PATH" ]]; then
+  sed -i "s|^ExecStart=.*npm.*|ExecStart=${NPM_PATH} run dev -- --host 0.0.0.0 --port 8501|" /etc/systemd/system/xiexin-frontend.service
+else
+  echo "[ERROR] npm executable not found" >&2
+  exit 1
+fi
+
+systemctl daemon-reload
+systemctl enable --now xiexin-backend xiexin-frontend
+
+echo "[STEP] Configure nginx"
+mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+cp "$APP_DIR/Deployer/nginx/xiexin-da-agent.conf" /etc/nginx/sites-available/xiexin-da-agent
+ln -sf /etc/nginx/sites-available/xiexin-da-agent /etc/nginx/sites-enabled/xiexin-da-agent
+
+# Optional: avoid conflicting server_name "_" warning
+rm -f /etc/nginx/sites-enabled/default
+
+nginx -t
+systemctl enable --now nginx
+systemctl reload nginx
+
+echo "[STEP] Health check"
+su - "$APP_USER" -c "cd '$APP_DIR' && bash Deployer/healthcheck.sh"
+
+echo "[DONE] Services status"
+systemctl --no-pager --full status xiexin-backend xiexin-frontend nginx || true
+
+echo
+echo "[INFO] Access:"
+echo "  - http://<public-ip>/"
+echo "  - http://<public-ip>:8765/health"
+echo "[INFO] Tencent Cloud security group: allow TCP 80 and TCP 8765"

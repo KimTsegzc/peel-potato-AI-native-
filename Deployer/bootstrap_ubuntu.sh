@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="$ROOT_DIR/.venv311"
 FRONTEND_DIR="$ROOT_DIR/Gateway/Front/react-ui"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
+PYTHON_BIN="${PYTHON_BIN:-python3.11}"
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -25,13 +25,35 @@ sudo apt-get install -y \
   git \
   curl \
   ca-certificates \
+  software-properties-common \
   build-essential \
   python3 \
+  python3.11 \
+  python3.11-venv \
+  python3.11-dev \
   python3-venv \
   python3-pip \
   nginx
 
-if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+if ! command -v python3.11 >/dev/null 2>&1; then
+  echo "[INFO] Installing Python 3.11 via deadsnakes PPA"
+  sudo add-apt-repository -y ppa:deadsnakes/ppa
+  sudo apt-get update
+  sudo apt-get install -y python3.11 python3.11-venv python3.11-dev
+fi
+
+PYTHON_BIN="$(command -v python3.11 || true)"
+if [[ -z "$PYTHON_BIN" ]]; then
+  echo "[ERROR] python3.11 is required but not available." >&2
+  exit 1
+fi
+
+NODE_MAJOR="$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/' || echo 0)"
+if [[ ! "$NODE_MAJOR" =~ ^[0-9]+$ ]]; then
+  NODE_MAJOR=0
+fi
+
+if [[ "$NODE_MAJOR" -lt 20 ]] || ! command -v npm >/dev/null 2>&1; then
   echo "[INFO] Installing Node.js 20 via NodeSource"
   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
   sudo apt-get install -y nodejs
@@ -40,6 +62,14 @@ fi
 echo "[INFO] Python version: $($PYTHON_BIN --version)"
 echo "[INFO] Node version: $(node --version)"
 echo "[INFO] npm version: $(npm --version)"
+
+"$PYTHON_BIN" - <<'PY'
+import sys
+major, minor = sys.version_info[:2]
+if (major, minor) < (3, 11):
+  raise SystemExit("Python 3.11+ required")
+print("[INFO] Python requirement check passed")
+PY
 
 if [[ ! -d "$VENV_DIR" ]]; then
   echo "[INFO] Creating virtual environment at $VENV_DIR"
