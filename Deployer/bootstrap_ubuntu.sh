@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="$ROOT_DIR/.venv311"
 FRONTEND_DIR="$ROOT_DIR/Gateway/Front/react-ui"
-PYTHON_BIN="${PYTHON_BIN:-python3.11}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -20,7 +20,7 @@ need_cmd sudo
 echo "[INFO] Root dir: $ROOT_DIR"
 
 echo "[INFO] Installing Ubuntu packages"
-sudo apt-get update
+sudo apt-get -o Acquire::ForceIPv4=true update
 sudo apt-get install -y \
   git \
   curl \
@@ -37,14 +37,18 @@ sudo apt-get install -y \
 
 if ! command -v python3.11 >/dev/null 2>&1; then
   echo "[INFO] Installing Python 3.11 via deadsnakes PPA"
-  sudo add-apt-repository -y ppa:deadsnakes/ppa
-  sudo apt-get update
-  sudo apt-get install -y python3.11 python3.11-venv python3.11-dev
+  if sudo add-apt-repository -y ppa:deadsnakes/ppa \
+      && sudo apt-get -o Acquire::ForceIPv4=true update \
+      && sudo apt-get install -y python3.11 python3.11-venv python3.11-dev; then
+    echo "[INFO] Python 3.11 installed"
+  else
+    echo "[WARN] Unable to install python3.11 from deadsnakes, will fallback to system python3"
+  fi
 fi
 
-PYTHON_BIN="$(command -v python3.11 || true)"
+PYTHON_BIN="$(command -v python3.11 || command -v python3 || true)"
 if [[ -z "$PYTHON_BIN" ]]; then
-  echo "[ERROR] python3.11 is required but not available." >&2
+  echo "[ERROR] python3 is required but not available." >&2
   exit 1
 fi
 
@@ -66,9 +70,9 @@ echo "[INFO] npm version: $(npm --version)"
 "$PYTHON_BIN" - <<'PY'
 import sys
 major, minor = sys.version_info[:2]
-if (major, minor) < (3, 11):
-  raise SystemExit("Python 3.11+ required")
-print("[INFO] Python requirement check passed")
+if (major, minor) < (3, 10):
+  raise SystemExit("Python 3.10+ required")
+print("[INFO] Python requirement check passed (>=3.10)")
 PY
 
 if [[ ! -d "$VENV_DIR" ]]; then

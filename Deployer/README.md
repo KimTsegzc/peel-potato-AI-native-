@@ -11,7 +11,7 @@ Ubuntu 可以用，而且对这个项目是合适的。
 ## 建议环境
 
 - Ubuntu 22.04 LTS 或 24.04 LTS
-- Python 3.11+
+- Python 3.10+ (recommended 3.11+)
 - Node.js 20+
 - npm 10+
 - nginx

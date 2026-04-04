@@ -22,14 +22,18 @@ echo "[INFO] GIT_URL=$GIT_URL"
 echo "[INFO] BRANCH=$BRANCH"
 
 echo "[STEP] Install base packages"
-apt-get update
+apt-get -o Acquire::ForceIPv4=true update
 apt-get install -y git curl ca-certificates sudo nginx software-properties-common python3 python3-pip
 
 if ! command -v python3.11 >/dev/null 2>&1; then
   echo "[INFO] python3.11 not found, installing via deadsnakes PPA"
-  add-apt-repository -y ppa:deadsnakes/ppa
-  apt-get update
-  apt-get install -y python3.11 python3.11-venv python3.11-dev
+  if add-apt-repository -y ppa:deadsnakes/ppa \
+      && apt-get -o Acquire::ForceIPv4=true update \
+      && apt-get install -y python3.11 python3.11-venv python3.11-dev; then
+    echo "[INFO] python3.11 installed"
+  else
+    echo "[WARN] Unable to install python3.11 from deadsnakes, fallback to system python3"
+  fi
 fi
 
 NODE_MAJOR="$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/' || echo 0)"
@@ -43,10 +47,10 @@ if [[ "$NODE_MAJOR" -lt 20 ]]; then
   apt-get install -y nodejs
 fi
 
-PYTHON_BIN="$(command -v python3.11 || true)"
+PYTHON_BIN="$(command -v python3.11 || command -v python3 || true)"
 NPM_BIN="$(command -v npm || true)"
 if [[ -z "$PYTHON_BIN" ]]; then
-  echo "[ERROR] python3.11 not found after install" >&2
+  echo "[ERROR] python3 not found after install" >&2
   exit 1
 fi
 if [[ -z "$NPM_BIN" ]]; then
@@ -57,6 +61,14 @@ fi
 echo "[INFO] Using Python: $PYTHON_BIN ($($PYTHON_BIN --version))"
 echo "[INFO] Using Node: $(node --version)"
 echo "[INFO] Using npm: $(npm --version)"
+
+"$PYTHON_BIN" - <<'PY'
+import sys
+major, minor = sys.version_info[:2]
+if (major, minor) < (3, 10):
+  raise SystemExit("Python 3.10+ required")
+print("[INFO] Python requirement check passed (>=3.10)")
+PY
 
 id -u "$APP_USER" >/dev/null 2>&1 || adduser --disabled-password --gecos "" "$APP_USER"
 mkdir -p /srv

@@ -48,8 +48,8 @@ check_cmd curl
 python3 - <<'PY'
 import sys
 major, minor = sys.version_info[:2]
-if (major, minor) < (3, 11):
-    raise SystemExit('Python 3.11+ required')
+if (major, minor) < (3, 10):
+  raise SystemExit('Python 3.10+ required')
 print('[PASS] Python version is', sys.version.split()[0])
 PY
 
