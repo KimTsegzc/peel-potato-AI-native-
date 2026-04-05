@@ -56,6 +56,8 @@ jobs:
 
             chown -R xiexin:xiexin "$APP_DIR"
             chmod 600 "$APP_DIR/.env" || true
+            mkdir -p "$APP_DIR/.runtime"
+            chown -R xiexin:xiexin "$APP_DIR/.runtime"
 
             cd "$APP_DIR"
             sudo -u xiexin -H bash -lc "cd '$APP_DIR' && SKIP_APT=1 bash Deployer/bootstrap_ubuntu.sh"
@@ -76,6 +78,18 @@ jobs:
             systemctl enable xiexin-backend xiexin-frontend >/dev/null 2>&1 || true
             systemctl restart xiexin-backend
             systemctl restart xiexin-frontend
+
+            sleep 2
+            if ! systemctl is-active --quiet xiexin-backend; then
+              systemctl --no-pager --full status xiexin-backend || true
+              journalctl -u xiexin-backend -n 120 --no-pager || true
+              exit 1
+            fi
+            if ! systemctl is-active --quiet xiexin-frontend; then
+              systemctl --no-pager --full status xiexin-frontend || true
+              journalctl -u xiexin-frontend -n 120 --no-pager || true
+              exit 1
+            fi
 
             cp "$APP_DIR/Deployer/nginx/xiexin-da-agent.conf" /etc/nginx/sites-available/xiexin-da-agent
             ln -sf /etc/nginx/sites-available/xiexin-da-agent /etc/nginx/sites-enabled/xiexin-da-agent
