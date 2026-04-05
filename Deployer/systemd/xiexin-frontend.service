@@ -1,0 +1,19 @@
+[Unit]
+Description=xiexin-da-agent frontend (Vite)
+After=network-online.target xiexin-backend.service
+Wants=network-online.target
+Requires=xiexin-backend.service
+
+[Service]
+Type=simple
+User=xiexin
+WorkingDirectory=/srv/xiexin-da-agent/Gateway/Front/react-ui
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run preview
+Restart=always
+RestartSec=3
+StandardOutput=append:/srv/xiexin-da-agent/.runtime/frontend-8501.out.log
+StandardError=append:/srv/xiexin-da-agent/.runtime/frontend-8501.err.log
+
+[Install]
+WantedBy=multi-user.target

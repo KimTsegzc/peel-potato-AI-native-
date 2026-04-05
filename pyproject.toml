@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "xiexin-da-agent"
-version = "7.0.0"
-requires-python = ">=3.11"
+version = "8.0.0"
+requires-python = ">=3.10"
 dependencies = [
     "openai>=1.14,<2.0",
     "pydantic-settings>=2.0",

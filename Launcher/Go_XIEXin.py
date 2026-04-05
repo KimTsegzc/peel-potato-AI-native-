@@ -15,8 +15,8 @@ from urllib.request import urlopen
 
 DEFAULT_PORT = 8501
 DEFAULT_HOST = "127.0.0.1"
-DEFAULT_BACKEND_PORT = 8765
-START_TIMEOUT_SECONDS = 90
+DEFAULT_BACKEND_PORT = 8766
+START_TIMEOUT_SECONDS = 45
 FRONTEND_PID_TEMPLATE = "frontend-{port}.pid"
 FRONTEND_STDOUT_TEMPLATE = "frontend-{port}.out.log"
 FRONTEND_STDERR_TEMPLATE = "frontend-{port}.err.log"
@@ -25,7 +25,7 @@ BACKEND_STDOUT_TEMPLATE = "backend-{port}.out.log"
 BACKEND_STDERR_TEMPLATE = "backend-{port}.err.log"
 LAUNCHER_LOG_NAME = "go_xiexin.log"
 RUNTIME_DIR_NAME = ".runtime"
-FRONTEND_DIR = Path("Gateway") / "Front" / "taro-mobile"
+FRONTEND_DIR = Path("Gateway") / "Front" / "react-ui"
 BACKEND_SCRIPT = Path("orchestrator.py")
 CREATE_NO_WINDOW = 0x08000000
 
@@ -241,6 +241,48 @@ def read_log_tail(log_path: Path, max_chars: int = 2000) -> str:
     return text[-max_chars:]
 
 
+def ensure_frontend_dependencies(
+    frontend_dir: Path,
+    npm_path: Path,
+    env: dict[str, str],
+    stdout_log: Path,
+    stderr_log: Path,
+    logger: logging.Logger,
+) -> tuple[bool, str]:
+    node_modules_dir = frontend_dir / "node_modules"
+    vite_binary = node_modules_dir / ".bin" / ("vite.cmd" if os.name == "nt" else "vite")
+    if node_modules_dir.exists() and vite_binary.exists():
+        logger.info("frontend dependencies already installed")
+        return True, ""
+
+    install_command = [str(npm_path), "ci"] if (frontend_dir / "package-lock.json").exists() else [str(npm_path), "install"]
+    logger.info("installing frontend dependencies command=%s cwd=%s", install_command, frontend_dir)
+
+    with stdout_log.open("ab") as stdout_handle, stderr_log.open("ab") as stderr_handle:
+        result = subprocess.run(
+            install_command,
+            cwd=frontend_dir,
+            env=env,
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+            creationflags=CREATE_NO_WINDOW,
+            check=False,
+        )
+
+    if result.returncode != 0:
+        logger.error("frontend dependency install failed with code=%s", result.returncode)
+        details = read_log_tail(stderr_log) or read_log_tail(stdout_log) or "No dependency installation logs were captured."
+        return False, details
+
+    if not vite_binary.exists():
+        logger.error("frontend dependency install finished but vite binary is still missing")
+        details = read_log_tail(stderr_log) or read_log_tail(stdout_log) or "Vite was still missing after installing dependencies."
+        return False, details
+
+    logger.info("frontend dependencies installed successfully")
+    return True, ""
+
+
 def start_frontend(repo_root: Path, port: int, python_override: str, launch_browser: bool, frontend_path: str = "") -> int:
     paths = runtime_paths(repo_root, port)
     logger = configure_logging(paths["launcher_log"])
@@ -250,7 +292,7 @@ def start_frontend(repo_root: Path, port: int, python_override: str, launch_brow
     logger.info("launcher start requested port=%s repo_root=%s frozen=%s", port, repo_root, is_frozen())
 
     if not frontend_dir.exists():
-        message = f"Taro frontend not found: {frontend_dir}"
+        message = f"React frontend not found: {frontend_dir}"
         logger.error(message)
         show_messagebox("Go_XIEXin", message, error=True)
         return 1
@@ -289,7 +331,6 @@ def start_frontend(repo_root: Path, port: int, python_override: str, launch_brow
 
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
-    env["TARO_APP_API_BASE"] = f"http://{DEFAULT_HOST}:{DEFAULT_BACKEND_PORT}"
 
     logger.info("starting orchestrator backend with python=%s script=%s", python_path, backend_script)
     with paths["backend_stdout_log"].open("ab") as backend_stdout_handle, paths["backend_stderr_log"].open("ab") as backend_stderr_handle:
@@ -325,18 +366,33 @@ def start_frontend(repo_root: Path, port: int, python_override: str, launch_brow
         show_messagebox("Go_XIEXin", message, error=True)
         return 1
 
-    logger.info("starting taro frontend with npm=%s dir=%s port=%s", npm_path, frontend_dir, port)
+    install_ok, install_details = ensure_frontend_dependencies(
+        frontend_dir=frontend_dir,
+        npm_path=npm_path,
+        env=env,
+        stdout_log=paths["frontend_stdout_log"],
+        stderr_log=paths["frontend_stderr_log"],
+        logger=logger,
+    )
+    if not install_ok:
+        message = (
+            "Go_XIEXin could not install frontend dependencies.\n\n"
+            f"Logs: {paths['frontend_stderr_log']}\n\n"
+            f"Recent output:\n{install_details}"
+        )
+        show_messagebox("Go_XIEXin", message, error=True)
+        return 1
+
+    logger.info("starting react frontend with npm=%s dir=%s", npm_path, frontend_dir)
     with paths["frontend_stdout_log"].open("ab") as stdout_handle, paths["frontend_stderr_log"].open("ab") as stderr_handle:
         process = subprocess.Popen(
             [
                 str(npm_path),
-                "exec",
+                "run",
+                "dev",
                 "--",
-                "taro",
-                "build",
-                "--type",
-                "h5",
-                "--watch",
+                "--host",
+                "0.0.0.0",
                 "--port",
                 str(port),
             ],
