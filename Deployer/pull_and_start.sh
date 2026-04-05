@@ -12,8 +12,8 @@ set -euo pipefail
 
 APP_USER="${APP_USER:-xiexin}"
 APP_DIR="${APP_DIR:-/srv/xiexin-da-agent}"
-BRANCH="${BRANCH:-xiexin-vite-proto}"
-GIT_URL="${GIT_URL:-https://github.com/KimTsegzc/xiexin-da-agent.git}"
+BRANCH="${BRANCH:-main}"
+GIT_URL="${GIT_URL:-git@github.com:KimTsegzc/xiexin-da-agent.git}"
 FORCE_BOOTSTRAP="${FORCE_BOOTSTRAP:-0}"
 USE_DEADSNAKES="${USE_DEADSNAKES:-}"
 
