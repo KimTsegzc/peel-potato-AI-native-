@@ -9,7 +9,7 @@ Type=simple
 User=xiexin
 WorkingDirectory=/srv/xiexin-da-agent/Gateway/Front/react-ui
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/npm run dev -- --host 0.0.0.0 --port 8501
+ExecStart=/usr/bin/npm run preview
 Restart=always
 RestartSec=3
 StandardOutput=append:/srv/xiexin-da-agent/.runtime/frontend-8501.out.log

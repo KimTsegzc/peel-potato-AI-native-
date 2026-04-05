@@ -4,7 +4,7 @@ Ubuntu 可以用，而且对这个项目是合适的。
 
 当前项目结构更适合这种部署方式：
 - Python 后端常驻在 `8766`（仅本机回环）
-- React 前端常驻在 `8501`
+- React 前端常驻在 `8501`（`npm run preview`，基于 `dist`）
 - 由 `systemd` 托管进程
 - 由 `nginx` 对外暴露入口
 

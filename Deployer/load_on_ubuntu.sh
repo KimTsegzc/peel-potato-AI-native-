@@ -241,6 +241,9 @@ if ! grep -Eq '^(ALIYUN_BAILIAN_API_KEY|DASHSCOPE_API_KEY)=' "$APP_DIR/.env"; th
   log_warn ".env has no API key yet. Edit now: nano $APP_DIR/.env"
 fi
 
+echo "[STEP] Build frontend dist"
+su - "$APP_USER" -c "cd '$APP_DIR/Gateway/Front/react-ui' && npm run build"
+
 echo "[STEP] Install systemd units"
 UNITS_CHANGED=0
 copy_if_changed "$APP_DIR/Deployer/systemd/xiexin-backend.service" /etc/systemd/system/xiexin-backend.service && UNITS_CHANGED=1 || true
@@ -264,7 +267,7 @@ fi
 
 if [[ -n "$NPM_PATH" ]]; then
   CURRENT_FRONTEND_EXEC="$(grep '^ExecStart=' /etc/systemd/system/xiexin-frontend.service || true)"
-  EXPECTED_FRONTEND_EXEC="ExecStart=${NPM_PATH} run dev -- --host 0.0.0.0 --port 8501"
+  EXPECTED_FRONTEND_EXEC="ExecStart=${NPM_PATH} run preview"
   if [[ "$CURRENT_FRONTEND_EXEC" != "$EXPECTED_FRONTEND_EXEC" ]]; then
     sed -i "s|^ExecStart=.*npm.*|${EXPECTED_FRONTEND_EXEC}|" /etc/systemd/system/xiexin-frontend.service
     UNITS_CHANGED=1
