@@ -2,6 +2,9 @@ import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+const backendPort = process.env.XIEXIN_BACKEND_PORT || process.env.BACKEND_PORT || "8765";
+const backendTarget = `http://127.0.0.1:${backendPort}`;
+
 export default defineConfig({
   plugins: [react()],
   build: {
@@ -17,13 +20,15 @@ export default defineConfig({
     port: 8501,
     // Proxy API calls to the backend orchestrator so that
     // `npm run dev` works without a separate nginx setup.
+    // Launcher defaults to 8765; production-like local setups can override via
+    // XIEXIN_BACKEND_PORT or BACKEND_PORT.
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8766",
+        target: backendTarget,
         changeOrigin: true,
       },
       "/health": {
-        target: "http://127.0.0.1:8766",
+        target: backendTarget,
         changeOrigin: true,
       },
     },
