@@ -20,7 +20,7 @@ jobs:
         uses: appleboy/ssh-action@master
         with:
           host: 81.71.25.120
-          username: ubuntu
+          username: root
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -euo pipefail
