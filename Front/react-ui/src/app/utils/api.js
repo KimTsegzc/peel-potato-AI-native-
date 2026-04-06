@@ -45,6 +45,24 @@ function getOrCreateWelcomeSessionId() {
   }
 }
 
+function createWelcomeSessionId() {
+  return (
+    (typeof window.crypto?.randomUUID === "function"
+      ? window.crypto.randomUUID().replace(/-/g, "")
+      : `${Date.now()}${Math.floor(Math.random() * 1e9)}`)
+  );
+}
+
+export function resetWelcomeSessionId() {
+  try {
+    const next = createWelcomeSessionId();
+    window.localStorage.setItem(WELCOME_SESSION_STORAGE_KEY, next);
+    return next;
+  } catch {
+    return "";
+  }
+}
+
 export async function fetchFrontendConfig(apiBase) {
   const response = await fetch(withClientDebugQuery(`${apiBase}${CONFIG_PATH}`));
   if (!response.ok) {

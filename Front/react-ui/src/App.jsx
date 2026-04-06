@@ -14,6 +14,7 @@ import { useViewportMetrics } from "./app/hooks/useViewportMetrics";
 import { DesktopShell } from "./app/shells/DesktopShell";
 import { MobileShell } from "./app/shells/MobileShell";
 import { WechatShell } from "./app/shells/WechatShell";
+import { resetWelcomeSessionId } from "./app/utils/api";
 import { resolveApiBase } from "./app/utils/clientMode";
 
 function useSettingsState({ chatMode, models, selectedModel }) {
@@ -70,7 +71,14 @@ function useSettingsState({ chatMode, models, selectedModel }) {
 export default function App() {
   const apiBase = useMemo(() => resolveApiBase(), []);
   const { clientMode, isMobileViewport, isMobileDefault, mobileLikeWechat } = useClientMode();
-  const { models, selectedModel, setSelectedModel, heroWelcomeText, configReady } = useFrontendConfig(apiBase);
+  const {
+    models,
+    selectedModel,
+    setSelectedModel,
+    heroWelcomeText,
+    configReady,
+    refreshFrontendConfig,
+  } = useFrontendConfig(apiBase);
   const { messages, input, setInput, loading, chatMode, handleSubmit, resetSession } = useChatSession({
     apiBase,
     selectedModel,
@@ -136,9 +144,11 @@ export default function App() {
     focusComposer();
   }
 
-  function handleNewChat() {
+  async function handleNewChat() {
     settingsState.setSettingsOpen(false);
     resetSession();
+    resetWelcomeSessionId();
+    await refreshFrontendConfig();
     setHeroTypingSeed((current) => current + 1);
   }
 
