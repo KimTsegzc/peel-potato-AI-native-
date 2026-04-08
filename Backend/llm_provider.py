@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import time
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -79,26 +80,22 @@ def _extract_usage_metrics(completion) -> dict:
 
 
 def _build_messages(settings: Settings, user_input: str) -> list[dict]:
+    now = datetime.now()
+    date_ctx = f"当前系统时间：{now.strftime('%Y年%m月%d日 %H:%M')}\n\n"
     return [
-        {"role": "system", "content": load_system_prompt()},
+        {"role": "system", "content": date_ctx + load_system_prompt()},
         {"role": "user", "content": user_input},
     ]
 
 
-def LLM_stream(
-    user_input: str,
-    model: Optional[str] = None,
-    smooth: bool = True,
-    enable_search: Optional[bool] = None,
+def _stream_chat_completion(
+    *,
+    settings: Settings,
+    messages: list[dict],
+    model: Optional[str],
+    smooth: bool,
+    enable_search: Optional[bool],
 ) -> Iterator[dict]:
-    """Stream model output as events for backend usage.
-
-    Yields events with shape:
-    - {"type": "pulse", "stage": "accepted|first_token", "elapsed_seconds": float}
-    - {"type": "delta", "content": "..."}
-    - {"type": "done", "content": "full text", "metrics": {...}}
-    """
-    settings = get_settings()
     client = build_client(settings)
     model_name = _resolve_model(settings, model=model)
     request_options = _resolve_request_options(settings)
@@ -108,9 +105,8 @@ def LLM_stream(
     yield {"type": "pulse", "stage": "accepted", "elapsed_seconds": 0.0}
 
     stream = client.chat.completions.create(
-        # 模型列表：https://help.aliyun.com/zh/model-studio/getting-started/models
         model=model_name,
-        messages=_build_messages(settings, user_input),
+        messages=messages,
         stream=True,
         stream_options={"include_usage": True},
         extra_body=_build_extra_body(resolved_enable_search),
@@ -184,6 +180,59 @@ def LLM_stream(
         **usage_metrics,
     }
     yield {"type": "done", "content": content, "metrics": metrics}
+
+
+def LLM_stream_messages(
+    messages: list[dict],
+    model: Optional[str] = None,
+    smooth: bool = True,
+    enable_search: Optional[bool] = None,
+) -> Iterator[dict]:
+    settings = get_settings()
+    yield from _stream_chat_completion(
+        settings=settings,
+        messages=messages,
+        model=model,
+        smooth=smooth,
+        enable_search=enable_search,
+    )
+
+
+def LLM_with_metrics_messages(
+    messages: list[dict],
+    model: Optional[str] = None,
+    enable_search: Optional[bool] = None,
+) -> tuple[str, dict]:
+    final_content = ""
+    final_metrics = {}
+    for event in LLM_stream_messages(messages, model=model, smooth=True, enable_search=enable_search):
+        if event.get("type") == "done":
+            final_content = event.get("content", "")
+            final_metrics = event.get("metrics", {})
+    return final_content, final_metrics
+
+
+def LLM_stream(
+    user_input: str,
+    model: Optional[str] = None,
+    smooth: bool = True,
+    enable_search: Optional[bool] = None,
+) -> Iterator[dict]:
+    """Stream model output as events for backend usage.
+
+    Yields events with shape:
+    - {"type": "pulse", "stage": "accepted|first_token", "elapsed_seconds": float}
+    - {"type": "delta", "content": "..."}
+    - {"type": "done", "content": "full text", "metrics": {...}}
+    """
+    settings = get_settings()
+    yield from _stream_chat_completion(
+        settings=settings,
+        messages=_build_messages(settings, user_input),
+        model=model,
+        smooth=smooth,
+        enable_search=enable_search,
+    )
 
 
 def LLM_with_metrics(
@@ -271,6 +320,20 @@ class LLMProvider:
         )
 
     @staticmethod
+    def stream_messages(
+        messages: list[dict],
+        model: Optional[str] = None,
+        smooth: bool = True,
+        enable_search: Optional[bool] = None,
+    ) -> Iterator[dict]:
+        yield from LLM_stream_messages(
+            messages=messages,
+            model=model,
+            smooth=smooth,
+            enable_search=enable_search,
+        )
+
+    @staticmethod
     def with_metrics(
         user_input: str,
         model: Optional[str] = None,
@@ -278,6 +341,18 @@ class LLMProvider:
     ) -> tuple[str, dict]:
         return LLM_with_metrics(
             user_input=user_input,
+            model=model,
+            enable_search=enable_search,
+        )
+
+    @staticmethod
+    def with_metrics_messages(
+        messages: list[dict],
+        model: Optional[str] = None,
+        enable_search: Optional[bool] = None,
+    ) -> tuple[str, dict]:
+        return LLM_with_metrics_messages(
+            messages=messages,
             model=model,
             enable_search=enable_search,
         )

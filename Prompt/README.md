@@ -3,6 +3,7 @@
 This directory is the home of prompt engineering assets.
 
 - `soul.md`: system prompt persona and behavior constraints.
+- `llm_summary.md`: rolling summary prompt used by backend context compression.
 - `welcome.py`: hero welcome text generator via `qwen-turbo`; prompt and generation parameters are self-contained in this module.
 
 Model service config:

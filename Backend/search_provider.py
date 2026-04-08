@@ -28,7 +28,7 @@ else:
     from .settings import Settings, get_settings
 
 # F5 direct-debug defaults (edit these quickly when debugging).
-DEBUG_DEFAULT_USER_INPUT = "近日油价调整消息。"
+DEBUG_DEFAULT_USER_INPUT = "大盘情况。"
 DEBUG_DEFAULT_MESSAGES_JSON = ""
 DEBUG_DEFAULT_TIMEOUT_SECONDS = 90.0
 DEBUG_VERBOSE_DEFAULT = True
