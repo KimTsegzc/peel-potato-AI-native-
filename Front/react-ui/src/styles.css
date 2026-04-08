@@ -931,7 +931,6 @@ textarea {
     bottom: var(--wechat-welcome-lock-bottom);
     width: min(var(--content-width), calc(var(--app-width-stable) - 20px));
     max-width: calc(var(--app-width-stable) - 20px);
-    padding-bottom: calc(var(--welcome-mobile-composer-height) + clamp(8px, 1.6vh, 12px));
     transform: translateX(-50%);
     overflow-x: clip;
     z-index: 6;
@@ -939,7 +938,6 @@ textarea {
 
   .app-shell.is-mobile-default.welcome-mode .welcome-stack-shell {
     width: min(var(--content-width), calc(var(--app-width-stable) - 24px));
-    padding-bottom: calc(var(--welcome-mobile-composer-height) + clamp(6px, 1.2vh, 10px));
   }
 
   .topbar {
@@ -1243,10 +1241,13 @@ textarea {
 
   .app-shell.is-wechat.welcome-mode .composer-shell,
   .app-shell.is-mobile-default.welcome-mode .composer-shell {
-    position: absolute;
+    position: fixed;
     left: 12px;
     right: 12px;
-    bottom: calc(var(--keyboard-offset) + var(--composer-bottom));
+    bottom: max(
+      calc(var(--wechat-welcome-lock-bottom) - var(--welcome-mobile-composer-height) - 12px),
+      calc(var(--keyboard-offset) + var(--composer-bottom))
+    );
     width: auto;
     margin-top: 0;
     transform: none;
