@@ -317,12 +317,16 @@ textarea {
 }
 
 .info-modal {
-  width: min(420px, calc(100vw - 28px));
+  width: min(70vw, calc(100vw - 28px));
+  height: min(70vh, calc(100vh - 28px));
   border: var(--line-width) solid var(--line);
   border-radius: 24px;
   background: #ffffff;
   box-shadow: var(--shadow-soft);
   padding: 22px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .info-modal-head {
@@ -330,11 +334,12 @@ textarea {
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
+  flex: 0 0 auto;
 }
 
 .info-modal-kicker {
   margin-bottom: 8px;
-  font-size: 12px;
+  font-size: 16px;
   letter-spacing: 0.12em;
   font-weight: 600;
   color: var(--muted);
@@ -344,8 +349,8 @@ textarea {
 
 .info-modal-title {
   margin: 0;
-  font-size: 24px;
-  line-height: 1.16;
+  font-size: 16px;
+  line-height: 1.68;
   font-weight: 700;
 }
 
@@ -383,6 +388,28 @@ textarea {
   margin-top: 18px;
   display: grid;
   gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 10px;
+  margin-right: -10px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.info-modal-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.info-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.info-modal-body::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 999px;
 }
 
 .info-meta-row,
@@ -392,7 +419,7 @@ textarea {
 }
 
 .info-meta-label {
-  font-size: 14px;
+  font-size: 16px;
   letter-spacing: 0.1em;
   font-weight: 600;
   text-transform: uppercase;
@@ -401,8 +428,8 @@ textarea {
 }
 
 .info-meta-value {
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.68;
   color: var(--ink);
 }
 
@@ -411,9 +438,16 @@ textarea {
   padding-left: 18px;
   display: grid;
   gap: 4px;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.68;
   color: var(--ink);
+}
+
+@media (orientation: landscape) {
+  .info-modal {
+    width: min(80vw, calc(100vw - 32px));
+    height: min(80vh, calc(100vh - 32px));
+  }
 }
 
 .settings-toggle.is-open span:nth-child(1) {
@@ -1473,24 +1507,14 @@ textarea {
   }
 
   .info-modal {
-    width: min(360px, calc(100vw - 20px));
     padding: 18px 18px 16px;
     border-radius: 20px;
-  }
-
-  .info-modal-title {
-    font-size: 20px;
   }
 
   .info-modal-close {
     width: 36px;
     height: 36px;
     border-radius: 10px;
-  }
-
-  .info-feature-list {
-    font-size: 14px;
-    line-height: 1.6;
   }
 
   .app-shell.is-wechat .hero-avatar,
