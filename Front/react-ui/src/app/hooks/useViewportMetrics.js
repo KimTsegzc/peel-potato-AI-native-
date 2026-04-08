@@ -79,7 +79,12 @@ export function useViewportMetrics({ clientMode, isMobileViewport, welcomeLockAc
     }
 
     function handleViewportEvent() {
+      if (welcomeLockActive) return;
       scheduleSyncViewportMetrics();
+    }
+
+    function handleOrientationChange() {
+      scheduleSyncViewportMetrics(true);
     }
 
     function scheduleSettledSync(delay) {
@@ -95,6 +100,7 @@ export function useViewportMetrics({ clientMode, isMobileViewport, welcomeLockAc
 
     function handleFocusIn(event) {
       if (!isEditableTarget(event.target)) return;
+      if (welcomeLockActive) return;
       if (shouldFreezeRef.current) {
         freezeUntilRef.current = Date.now() + 280;
         scheduleSettledSync(320);
@@ -105,6 +111,7 @@ export function useViewportMetrics({ clientMode, isMobileViewport, welcomeLockAc
 
     function handleFocusOut(event) {
       if (!isEditableTarget(event.target)) return;
+      if (welcomeLockActive) return;
       if (shouldFreezeRef.current) {
         freezeUntilRef.current = Date.now() + 140;
         scheduleSettledSync(200);
@@ -115,7 +122,7 @@ export function useViewportMetrics({ clientMode, isMobileViewport, welcomeLockAc
 
     writeViewportMetrics();
     window.addEventListener("resize", handleViewportEvent);
-    window.addEventListener("orientationchange", handleViewportEvent);
+    window.addEventListener("orientationchange", handleOrientationChange);
     window.visualViewport?.addEventListener("resize", handleViewportEvent);
     if (shouldTrackViewportScroll) {
       window.visualViewport?.addEventListener("scroll", handleViewportEvent);
@@ -131,7 +138,7 @@ export function useViewportMetrics({ clientMode, isMobileViewport, welcomeLockAc
         window.clearTimeout(timerRef.current);
       }
       window.removeEventListener("resize", handleViewportEvent);
-      window.removeEventListener("orientationchange", handleViewportEvent);
+      window.removeEventListener("orientationchange", handleOrientationChange);
       window.visualViewport?.removeEventListener("resize", handleViewportEvent);
       if (shouldTrackViewportScroll) {
         window.visualViewport?.removeEventListener("scroll", handleViewportEvent);
