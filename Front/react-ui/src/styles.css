@@ -367,7 +367,7 @@ textarea {
   margin: 0;
   justify-content: flex-start;
   gap: var(--welcome-stack-gap);
-  transform: translateY(var(--welcome-stack-shift));
+  transform: translateY(calc(var(--welcome-stack-shift) - 24px));
 }
 
 .hero-avatar {
@@ -389,6 +389,20 @@ textarea {
   line-height: 1.08;
   font-weight: 700;
   max-width: 920px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.hero-title-line {
+  display: inline;
+}
+
+.hero-title.is-multiline {
+  white-space: normal;
+}
+
+.hero-title.is-multiline .hero-title-line {
+  display: block;
 }
 
 .chat-stage {
@@ -1008,8 +1022,12 @@ textarea {
   .app-shell.is-wechat .hero-title,
   .app-shell.is-mobile-default .hero-title {
     max-width: none;
-    white-space: nowrap;
     letter-spacing: -0.02em;
+  }
+
+  .app-shell.is-wechat .hero-title.is-multiline,
+  .app-shell.is-mobile-default .hero-title.is-multiline {
+    white-space: normal;
   }
 
   .app-shell.is-wechat.welcome-mode .hero-panel,
@@ -1019,7 +1037,7 @@ textarea {
     bottom: auto;
     width: 100%;
     margin: 0;
-    transform: none;
+    transform: translateY(-38px);
     z-index: 6;
   }
 
