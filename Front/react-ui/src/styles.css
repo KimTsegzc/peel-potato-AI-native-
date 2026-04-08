@@ -322,18 +322,18 @@ textarea {
   border-radius: 24px;
   background: #ffffff;
   box-shadow: var(--shadow-soft);
-  padding: 18px 18px 16px;
+  padding: 22px 22px 20px;
 }
 
 .info-modal-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
 }
 
 .info-modal-kicker {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-size: 12px;
   letter-spacing: 0.12em;
   font-weight: 600;
@@ -380,19 +380,19 @@ textarea {
 }
 
 .info-modal-body {
-  margin-top: 16px;
+  margin-top: 18px;
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .info-meta-row,
 .info-meta-block {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .info-meta-label {
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0.1em;
   font-weight: 600;
   text-transform: uppercase;
@@ -401,8 +401,8 @@ textarea {
 }
 
 .info-meta-value {
-  font-size: 15px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.6;
   color: var(--ink);
 }
 
@@ -410,9 +410,9 @@ textarea {
   margin: 0;
   padding-left: 18px;
   display: grid;
-  gap: 6px;
+  gap: 4px;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--ink);
 }
 
@@ -548,6 +548,7 @@ textarea {
   justify-content: center;
   min-width: 0;
   min-height: calc(2 * 1.3em + 8px);
+  position: relative;
 }
 
 .hero-copy.is-singleline {
@@ -570,6 +571,23 @@ textarea {
   min-width: 0;
   white-space: nowrap;
   text-align: center;
+}
+
+.hero-title.is-pending {
+  visibility: hidden;
+}
+
+.hero-title-measure {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 .hero-title.is-singleline {
@@ -1456,7 +1474,7 @@ textarea {
 
   .info-modal {
     width: min(360px, calc(100vw - 20px));
-    padding: 16px 16px 14px;
+    padding: 18px 18px 16px;
     border-radius: 20px;
   }
 
@@ -1471,8 +1489,8 @@ textarea {
   }
 
   .info-feature-list {
-    font-size: 13px;
-    line-height: 1.45;
+    font-size: 14px;
+    line-height: 1.6;
   }
 
   .app-shell.is-wechat .hero-avatar,

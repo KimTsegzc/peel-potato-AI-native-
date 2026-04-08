@@ -32,36 +32,64 @@ function splitWelcomeTitle(text, forceMultiline = false) {
 }
 
 export function WelcomeShell({ statusText, composerProps }) {
-  const titleRef = useRef(null);
-  const [forceMultiline, setForceMultiline] = useState(false);
+  const copyRef = useRef(null);
+  const measureRef = useRef(null);
+  const [titleLayout, setTitleLayout] = useState({
+    text: "",
+    forceMultiline: false,
+    ready: false,
+  });
   const titleText = String(statusText || "").trim();
 
   useLayoutEffect(() => {
-    const titleElement = titleRef.current;
-    if (!titleElement || !titleText) {
-      setForceMultiline(false);
+    const copyElement = copyRef.current;
+    const measureElement = measureRef.current;
+    if (!copyElement || !measureElement) {
       return undefined;
     }
 
+    if (!titleText) {
+      setTitleLayout({ text: "", forceMultiline: false, ready: true });
+      return undefined;
+    }
+
+    let frameId = 0;
+
     const evaluateOverflow = () => {
-      const previousWhiteSpace = titleElement.style.whiteSpace;
-      const previousDisplay = titleElement.style.display;
-      titleElement.style.whiteSpace = "nowrap";
-      titleElement.style.display = "block";
-      const isOverflowing = titleElement.scrollWidth > titleElement.clientWidth + 1;
-      titleElement.style.whiteSpace = previousWhiteSpace;
-      titleElement.style.display = previousDisplay;
-      setForceMultiline((current) => (current === isOverflowing ? current : isOverflowing));
+      const availableWidth = copyElement.clientWidth;
+      if (!availableWidth) {
+        frameId = window.requestAnimationFrame(evaluateOverflow);
+        return;
+      }
+
+      const isOverflowing = measureElement.scrollWidth > availableWidth + 1;
+      setTitleLayout((current) => {
+        const hasSameText = current.text === titleText;
+        const nextForceMultiline = hasSameText
+          ? current.forceMultiline || isOverflowing
+          : isOverflowing;
+
+        if (
+          hasSameText
+          && current.forceMultiline === nextForceMultiline
+          && current.ready
+        ) {
+          return current;
+        }
+
+        return {
+          text: titleText,
+          forceMultiline: nextForceMultiline,
+          ready: true,
+        };
+      });
     };
 
-    const frameId = window.requestAnimationFrame(evaluateOverflow);
+    evaluateOverflow();
     const resizeObserver = typeof ResizeObserver === "function"
       ? new ResizeObserver(() => evaluateOverflow())
       : null;
-    resizeObserver?.observe(titleElement);
-    if (titleElement.parentElement) {
-      resizeObserver?.observe(titleElement.parentElement);
-    }
+    resizeObserver?.observe(copyElement);
     window.addEventListener("resize", evaluateOverflow);
 
     return () => {
@@ -70,6 +98,9 @@ export function WelcomeShell({ statusText, composerProps }) {
       window.removeEventListener("resize", evaluateOverflow);
     };
   }, [titleText]);
+
+  const isResolved = titleLayout.text === titleText && titleLayout.ready;
+  const forceMultiline = titleLayout.text === titleText && titleLayout.forceMultiline;
 
   const title = useMemo(
     () => splitWelcomeTitle(titleText, forceMultiline),
@@ -80,8 +111,11 @@ export function WelcomeShell({ statusText, composerProps }) {
     <div className="welcome-stack-shell">
       <section className="hero-panel">
         <InteractiveAvatar className="hero-avatar" alt="鑫哥头像" />
-        <div className={`hero-copy${title.multiline ? " is-multiline" : " is-singleline"}`}>
-          <h1 ref={titleRef} className={`hero-title${title.multiline ? " is-multiline" : " is-singleline"}`}>
+        <div ref={copyRef} className={`hero-copy${title.multiline ? " is-multiline" : " is-singleline"}`}>
+          <h1 ref={measureRef} aria-hidden="true" className="hero-title hero-title-measure">
+            {titleText}
+          </h1>
+          <h1 className={`hero-title${title.multiline ? " is-multiline" : " is-singleline"}${isResolved ? " is-ready" : " is-pending"}`}>
             {title.lines.map((line, index) => (
               <span key={`${line}-${index}`} className="hero-title-line">
                 {line}
