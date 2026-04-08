@@ -36,8 +36,8 @@ export function WelcomeShell({ statusText, composerProps }) {
     <div className="welcome-stack-shell">
       <section className="hero-panel">
         <InteractiveAvatar className="hero-avatar" alt="鑫哥头像" />
-        <div className="hero-copy">
-          <h1 className={`hero-title${title.multiline ? " is-multiline" : ""}`}>
+        <div className={`hero-copy${title.multiline ? " is-multiline" : " is-singleline"}`}>
+          <h1 className={`hero-title${title.multiline ? " is-multiline" : " is-singleline"}`}>
             {title.lines.map((line, index) => (
               <span key={`${line}-${index}`} className="hero-title-line">
                 {line}

@@ -41,13 +41,13 @@
   --welcome-mobile-bottom-band: clamp(18px, 6vh, 56px);
   --welcome-mobile-top-flex: 1fr;
   --welcome-mobile-bottom-flex: 0.75fr;
-  --welcome-mobile-row-gap: clamp(14px, 2.6vh, 22px);
+  --welcome-mobile-row-gap: clamp(10px, 1.9vh, 16px);
   --welcome-mobile-avatar-title-gap: var(--welcome-mobile-row-gap);
   --welcome-mobile-title-composer-gap: var(--welcome-mobile-row-gap);
   --welcome-mobile-title-size: clamp(19px, 5.7vw, 28px);
   --welcome-mobile-composer-width: min(920px, calc(var(--app-width) - 24px));
   --welcome-mobile-composer-height: 58px;
-  --wechat-welcome-lock-bottom: 41vh;
+  --wechat-welcome-lock-bottom: 35vh;
 }
 
 * {
@@ -362,12 +362,18 @@ textarea {
   align-items: center;
 }
 
+.welcome-mode .welcome-stack-shell {
+  display: grid;
+  justify-items: center;
+  grid-template-rows: clamp(240px, 34vh, 320px) auto;
+}
+
 .welcome-mode .hero-panel {
   width: min(var(--content-width), calc(100vw - 32px));
   margin: 0;
   justify-content: flex-start;
   gap: var(--welcome-stack-gap);
-  min-height: clamp(240px, 34vh, 320px);
+  height: clamp(240px, 34vh, 320px);
   transform: translateY(calc(var(--welcome-stack-shift) - 24px));
 }
 
@@ -387,6 +393,16 @@ textarea {
   min-height: calc(2 * 1.3em + 8px);
 }
 
+.hero-copy.is-singleline {
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.hero-copy.is-multiline {
+  justify-content: center;
+  padding-top: 0;
+}
+
 .hero-title {
   margin: 0;
   font-size: clamp(22px, 2.95vw, 42px);
@@ -395,6 +411,10 @@ textarea {
   max-width: 920px;
   white-space: nowrap;
   text-align: center;
+}
+
+.hero-title.is-singleline {
+  line-height: 1.12;
 }
 
 .hero-title-line {
@@ -1042,12 +1062,12 @@ textarea {
     bottom: auto;
     width: 100%;
     margin: 0;
-    transform: translateY(-38px);
+    transform: translateY(-20px);
     z-index: 6;
   }
 
   .app-shell.is-mobile-default.welcome-mode .hero-panel {
-    gap: clamp(14px, 3.6vw, 22px);
+    gap: clamp(10px, 2.8vw, 16px);
   }
 
   .chat-stage {
@@ -1210,13 +1230,13 @@ textarea {
     left: auto;
     bottom: auto;
     width: var(--welcome-mobile-composer-width);
-    margin-top: var(--welcome-mobile-title-composer-gap);
+    margin-top: clamp(8px, 1.6vh, 12px);
     transform: none;
     z-index: 6;
   }
 
   .app-shell.is-mobile-default.welcome-mode .composer-shell {
-    margin-top: clamp(10px, 2.2vh, 16px);
+    margin-top: clamp(6px, 1.2vh, 10px);
   }
 
   .app-shell.is-wechat.welcome-mode .composer-box,
