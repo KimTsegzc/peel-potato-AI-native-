@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 import threading
 import time
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Any, Iterator, Optional
 
 from openai import OpenAI
 
@@ -70,6 +71,15 @@ def _build_extra_body(enable_search: bool) -> dict:
     return {"enable_search": enable_search}
 
 
+def _safe_json_loads(raw_text: str) -> Any:
+    if not raw_text:
+        return {}
+    try:
+        return json.loads(raw_text)
+    except json.JSONDecodeError:
+        return raw_text
+
+
 def _extract_usage_metrics(completion) -> dict:
     usage = getattr(completion, "usage", None)
     return {
@@ -77,6 +87,40 @@ def _extract_usage_metrics(completion) -> dict:
         "completion_tokens": getattr(usage, "completion_tokens", None),
         "total_tokens": getattr(usage, "total_tokens", None),
     }
+
+
+def _extract_message_content(message) -> str:
+    content = getattr(message, "content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                parts.append(str(item.get("text", "")))
+            else:
+                parts.append(str(getattr(item, "text", "") or ""))
+        return "".join(parts)
+    return str(content or "")
+
+
+def _extract_tool_calls(message) -> list[dict[str, Any]]:
+    calls: list[dict[str, Any]] = []
+    for tool_call in getattr(message, "tool_calls", None) or []:
+        function = getattr(tool_call, "function", None)
+        arguments_text = str(getattr(function, "arguments", "") or "")
+        calls.append(
+            {
+                "id": getattr(tool_call, "id", None),
+                "type": getattr(tool_call, "type", None) or "function",
+                "function": {
+                    "name": getattr(function, "name", None),
+                    "arguments": _safe_json_loads(arguments_text),
+                    "arguments_text": arguments_text,
+                },
+            }
+        )
+    return calls
 
 
 def _build_messages(settings: Settings, user_input: str) -> list[dict]:
@@ -88,6 +132,36 @@ def _build_messages(settings: Settings, user_input: str) -> list[dict]:
     ]
 
 
+def _create_chat_completion(
+    *,
+    settings: Settings,
+    messages: list[dict],
+    model: Optional[str],
+    enable_search: Optional[bool],
+    stream: bool,
+    tools: list[dict[str, Any]] | None = None,
+    tool_choice: dict[str, Any] | str | None = None,
+):
+    client = build_client(settings)
+    model_name = _resolve_model(settings, model=model)
+    request_options = _resolve_request_options(settings)
+    resolved_enable_search = _resolve_enable_search(settings, enable_search=enable_search)
+    create_kwargs: dict[str, Any] = {
+        "model": model_name,
+        "messages": messages,
+        "stream": stream,
+        "extra_body": _build_extra_body(resolved_enable_search),
+        **request_options,
+    }
+    if stream:
+        create_kwargs["stream_options"] = {"include_usage": True}
+    if tools:
+        create_kwargs["tools"] = tools
+    if tool_choice is not None:
+        create_kwargs["tool_choice"] = tool_choice
+    return client.chat.completions.create(**create_kwargs), model_name, request_options, resolved_enable_search
+
+
 def _stream_chat_completion(
     *,
     settings: Settings,
@@ -95,22 +169,20 @@ def _stream_chat_completion(
     model: Optional[str],
     smooth: bool,
     enable_search: Optional[bool],
+    tools: list[dict[str, Any]] | None = None,
+    tool_choice: dict[str, Any] | str | None = None,
 ) -> Iterator[dict]:
-    client = build_client(settings)
-    model_name = _resolve_model(settings, model=model)
-    request_options = _resolve_request_options(settings)
-    resolved_enable_search = _resolve_enable_search(settings, enable_search=enable_search)
-
     started = time.perf_counter()
     yield {"type": "pulse", "stage": "accepted", "elapsed_seconds": 0.0}
 
-    stream = client.chat.completions.create(
-        model=model_name,
+    stream, model_name, request_options, resolved_enable_search = _create_chat_completion(
+        settings=settings,
         messages=messages,
+        model=model,
+        enable_search=enable_search,
         stream=True,
-        stream_options={"include_usage": True},
-        extra_body=_build_extra_body(resolved_enable_search),
-        **request_options,
+        tools=tools,
+        tool_choice=tool_choice,
     )
 
     all_parts = []
@@ -123,6 +195,7 @@ def _stream_chat_completion(
         "completion_tokens": None,
         "total_tokens": None,
     }
+    tool_call_parts: dict[int, dict[str, Any]] = {}
 
     for chunk in stream:
         chunk_usage = _extract_usage_metrics(chunk)
@@ -133,6 +206,23 @@ def _stream_chat_completion(
             continue
 
         delta = chunk.choices[0].delta
+        for tool_delta in getattr(delta, "tool_calls", None) or []:
+            call_index = int(getattr(tool_delta, "index", 0) or 0)
+            current = tool_call_parts.setdefault(
+                call_index,
+                {"id": None, "type": "function", "function": {"name": "", "arguments_text": ""}},
+            )
+            if getattr(tool_delta, "id", None):
+                current["id"] = tool_delta.id
+            if getattr(tool_delta, "type", None):
+                current["type"] = tool_delta.type
+            function = getattr(tool_delta, "function", None)
+            if function is not None:
+                if getattr(function, "name", None):
+                    current["function"]["name"] = function.name
+                if getattr(function, "arguments", None):
+                    current["function"]["arguments_text"] += function.arguments
+
         piece = getattr(delta, "content", None)
         if piece:
             if not first_token_emitted:
@@ -166,12 +256,29 @@ def _stream_chat_completion(
 
     elapsed = time.perf_counter() - started
     content = "".join(all_parts)
+    tool_calls = []
+    for index in sorted(tool_call_parts):
+        item = tool_call_parts[index]
+        arguments_text = item["function"].get("arguments_text", "")
+        tool_calls.append(
+            {
+                "id": item.get("id"),
+                "type": item.get("type") or "function",
+                "function": {
+                    "name": item["function"].get("name") or None,
+                    "arguments": _safe_json_loads(arguments_text),
+                    "arguments_text": arguments_text,
+                },
+            }
+        )
     throughput_tokens = usage_metrics["completion_tokens"] or usage_metrics["total_tokens"]
     metrics = {
         "model": model_name,
         "base_url": settings.base_url,
         "enable_search": resolved_enable_search,
         "request_options": request_options,
+        "tool_choice_used": tool_choice,
+        "tool_count": len(tools or []),
         "first_token_latency_seconds": first_token_latency_seconds,
         "latency_seconds": elapsed,
         "throughput_tokens_per_second": (
@@ -179,7 +286,7 @@ def _stream_chat_completion(
         ),
         **usage_metrics,
     }
-    yield {"type": "done", "content": content, "metrics": metrics}
+    yield {"type": "done", "content": content, "metrics": metrics, "tool_calls": tool_calls}
 
 
 def LLM_stream_messages(
@@ -187,6 +294,8 @@ def LLM_stream_messages(
     model: Optional[str] = None,
     smooth: bool = True,
     enable_search: Optional[bool] = None,
+    tools: list[dict[str, Any]] | None = None,
+    tool_choice: dict[str, Any] | str | None = None,
 ) -> Iterator[dict]:
     settings = get_settings()
     yield from _stream_chat_completion(
@@ -195,6 +304,8 @@ def LLM_stream_messages(
         model=model,
         smooth=smooth,
         enable_search=enable_search,
+        tools=tools,
+        tool_choice=tool_choice,
     )
 
 
@@ -210,6 +321,44 @@ def LLM_with_metrics_messages(
             final_content = event.get("content", "")
             final_metrics = event.get("metrics", {})
     return final_content, final_metrics
+
+
+def LLM_with_response_messages(
+    messages: list[dict],
+    model: Optional[str] = None,
+    enable_search: Optional[bool] = None,
+    tools: list[dict[str, Any]] | None = None,
+    tool_choice: dict[str, Any] | str | None = None,
+) -> dict[str, Any]:
+    settings = get_settings()
+    started = time.perf_counter()
+    completion, model_name, request_options, resolved_enable_search = _create_chat_completion(
+        settings=settings,
+        messages=messages,
+        model=model,
+        enable_search=enable_search,
+        stream=False,
+        tools=tools,
+        tool_choice=tool_choice,
+    )
+    elapsed = time.perf_counter() - started
+    message = completion.choices[0].message if getattr(completion, "choices", None) else None
+    usage_metrics = _extract_usage_metrics(completion)
+    tool_calls = _extract_tool_calls(message) if message is not None else []
+    return {
+        "content": _extract_message_content(message) if message is not None else "",
+        "tool_calls": tool_calls,
+        "metrics": {
+            "model": model_name,
+            "base_url": settings.base_url,
+            "enable_search": resolved_enable_search,
+            "request_options": request_options,
+            "tool_choice_used": tool_choice,
+            "tool_count": len(tools or []),
+            "latency_seconds": elapsed,
+            **usage_metrics,
+        },
+    }
 
 
 def LLM_stream(
@@ -325,12 +474,16 @@ class LLMProvider:
         model: Optional[str] = None,
         smooth: bool = True,
         enable_search: Optional[bool] = None,
+        tools: list[dict[str, Any]] | None = None,
+        tool_choice: dict[str, Any] | str | None = None,
     ) -> Iterator[dict]:
         yield from LLM_stream_messages(
             messages=messages,
             model=model,
             smooth=smooth,
             enable_search=enable_search,
+            tools=tools,
+            tool_choice=tool_choice,
         )
 
     @staticmethod
@@ -355,6 +508,22 @@ class LLMProvider:
             messages=messages,
             model=model,
             enable_search=enable_search,
+        )
+
+    @staticmethod
+    def with_response_messages(
+        messages: list[dict],
+        model: Optional[str] = None,
+        enable_search: Optional[bool] = None,
+        tools: list[dict[str, Any]] | None = None,
+        tool_choice: dict[str, Any] | str | None = None,
+    ) -> dict[str, Any]:
+        return LLM_with_response_messages(
+            messages=messages,
+            model=model,
+            enable_search=enable_search,
+            tools=tools,
+            tool_choice=tool_choice,
         )
 
     @staticmethod

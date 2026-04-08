@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from .skills.base import BaseSkill
+from .skills.base import BaseSkill, SkillDescriptor
 
 
 class SkillRegistry:
@@ -20,6 +20,9 @@ class SkillRegistry:
 
     def names(self) -> Iterable[str]:
         return self._skills.keys()
+
+    def descriptors(self) -> tuple[SkillDescriptor, ...]:
+        return tuple(skill.descriptor() for skill in self._skills.values())
 
 
 class ToolRegistry:

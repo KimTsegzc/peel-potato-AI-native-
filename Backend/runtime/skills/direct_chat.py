@@ -13,6 +13,21 @@ class DirectChatSkill(BaseSkill):
     """Compatibility skill that forwards directly to the existing LLM provider."""
 
     name = "direct_chat"
+    description = "通用对话兜底技能，处理闲聊、开放问答以及不属于专门业务技能的问题。"
+    routing_hints = (
+        "普通闲聊、问候、开放式问答",
+        "无法明确归属到某个内部业务技能的问题",
+        "外部机构、外部客服电话、泛生活类问题",
+    )
+    avoid_hints = (
+        "明确要求查询分行内部职能分工、岗位负责人与办公号码",
+    )
+    routing_examples = (
+        "hi",
+        "客户咨询保险业务找谁",
+        "今天几点了",
+    )
+    manual_relpath = "direct_chat.SKILL.md"
 
     def run_stream(self, request: AgentRequest) -> Iterator[dict]:
         settings = get_settings()

@@ -92,6 +92,14 @@ class Settings(BaseSettings):
         default=True,
         validation_alias=AliasChoices("LLM_ENABLE_SEARCH", "ENABLE_SEARCH"),
     )
+    skill_routing_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("LLM_SKILL_ROUTING_ENABLED", "SKILL_ROUTING_ENABLED"),
+    )
+    skill_router_model: str = Field(
+        default="qwen-turbo",
+        validation_alias=AliasChoices("LLM_SKILL_ROUTER_MODEL", "SKILL_ROUTER_MODEL"),
+    )
     summary_enabled: bool = Field(
         default=True,
         validation_alias=AliasChoices("LLM_SUMMARY_ENABLED", "SUMMARY_ENABLED"),

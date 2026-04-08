@@ -4,7 +4,8 @@ from typing import Iterator
 
 from .contracts import AgentRequest, AgentResponse
 from .registry import SkillRegistry, ToolRegistry
-from .skills import DirectChatSkill
+from .router import RouteDecision, SkillRouter
+from .skills import CCBGetHandlerSkill, DirectChatSkill
 
 
 class AgentRuntime:
@@ -13,24 +14,32 @@ class AgentRuntime:
     def __init__(self) -> None:
         self.skills = SkillRegistry()
         self.tools = ToolRegistry()
+        self.router = SkillRouter()
         self._bootstrap_defaults()
 
     def _bootstrap_defaults(self) -> None:
+        self.skills.register(CCBGetHandlerSkill())
         self.skills.register(DirectChatSkill())
 
-    def _select_skill_name(self, request: AgentRequest) -> str:
-        # Placeholder for future planner/policy routing.
-        return "direct_chat"
+    def _select_route(self, request: AgentRequest) -> RouteDecision:
+        return self.router.select_skill(request, self.skills)
 
     def run_stream(self, request: AgentRequest) -> Iterator[dict]:
-        skill_name = self._select_skill_name(request)
-        skill = self.skills.get(skill_name)
-        yield from skill.run_stream(request)
+        decision = self._select_route(request)
+        skill = self.skills.get(decision.skill_name)
+        for event in skill.run_stream(request):
+            if event.get("type") == "done":
+                metrics = dict(event.get("metrics", {}))
+                metrics["routing"] = decision.metrics()
+                event = {**event, "metrics": metrics}
+            yield event
 
     def run_once(self, request: AgentRequest) -> AgentResponse:
-        skill_name = self._select_skill_name(request)
-        skill = self.skills.get(skill_name)
-        return skill.run_once(request)
+        decision = self._select_route(request)
+        skill = self.skills.get(decision.skill_name)
+        response = skill.run_once(request)
+        response.metrics["routing"] = decision.metrics()
+        return response
 
 
 _RUNTIME: AgentRuntime | None = None

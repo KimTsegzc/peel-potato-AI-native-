@@ -68,16 +68,16 @@ export function SettingsControl({
             <span className="info-meta-value">{PROJECT_INFO.version}</span>
           </div>
           <div className="info-meta-block">
-            <div className="info-meta-label">版本变更</div>
-            <div className="info-meta-value">{PROJECT_INFO.versionChange}</div>
-          </div>
-          <div className="info-meta-block">
             <div className="info-meta-label">主要功能</div>
             <ul className="info-feature-list">
               {PROJECT_INFO.features.map((feature) => (
                 <li key={feature}>{feature}</li>
               ))}
             </ul>
+          </div>
+          <div className="info-meta-block">
+            <div className="info-meta-label">版本变更</div>
+            <div className="info-meta-value">{PROJECT_INFO.versionChange}</div>
           </div>
         </div>
       </section>
