@@ -29,11 +29,13 @@ export function useViewportMetrics({ clientMode, isMobileViewport, welcomeLockAc
     function writeViewportMetrics() {
       const viewport = window.visualViewport;
       const viewportHeight = Math.round(viewport?.height || window.innerHeight);
+      const viewportOffsetTop = Math.round(viewport?.offsetTop || 0);
       const viewportWidth = Math.round(window.innerWidth);
       const observedViewportWidth = Math.round(viewport?.width || viewportWidth);
       const nextStableHeight = Math.max(stableViewportHeightRef.current || 0, viewportHeight, window.innerHeight);
       const nextStableWidth = Math.max(stableViewportWidthRef.current || 0, observedViewportWidth, viewportWidth);
-      const keyboardOffsetRaw = Math.max(0, nextStableHeight - viewportHeight);
+      const viewportBottom = viewportOffsetTop + viewportHeight;
+      const keyboardOffsetRaw = Math.max(0, nextStableHeight - viewportBottom);
       const keyboardThreshold = Math.max(72, Math.round(nextStableHeight * 0.12));
       const hasEditableFocus = isEditableTarget(document.activeElement);
       const keyboardOffset = hasEditableFocus && keyboardOffsetRaw > keyboardThreshold ? keyboardOffsetRaw : 0;
