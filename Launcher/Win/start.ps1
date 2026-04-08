@@ -9,10 +9,10 @@ param(
 $ErrorActionPreference = "Stop"
 
 function Show-Phase([string]$text) {
-    Write-Host "[start_stack] $text" -ForegroundColor Cyan
+    Write-Host "[start] $text" -ForegroundColor Cyan
 }
 
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
 $LauncherExe = Join-Path $RepoRoot "Go_XIEXin.exe"
 $LauncherScript = Join-Path $RepoRoot "Launcher\Go_XIEXin.py"
 
@@ -72,16 +72,16 @@ if ($NoBrowser) {
 $exitCode = $LASTEXITCODE
 
 if ($exitCode -ne 0) {
-    Write-Host "[start_stack] launcher failed exitCode=$exitCode" -ForegroundColor Red
+    Write-Host "[start] launcher failed exitCode=$exitCode" -ForegroundColor Red
     $runtimeDir = Join-Path $RepoRoot ".runtime"
     $backendErr = Join-Path $runtimeDir "backend-8766.err.log"
     $frontendErr = Join-Path $runtimeDir "frontend-$Port.err.log"
     if (Test-Path $backendErr) {
-        Write-Host "[start_stack] backend err tail:" -ForegroundColor Yellow
+        Write-Host "[start] backend err tail:" -ForegroundColor Yellow
         Get-Content $backendErr -Tail 30
     }
     if (Test-Path $frontendErr) {
-        Write-Host "[start_stack] frontend err tail:" -ForegroundColor Yellow
+        Write-Host "[start] frontend err tail:" -ForegroundColor Yellow
         Get-Content $frontendErr -Tail 30
     }
     exit $exitCode

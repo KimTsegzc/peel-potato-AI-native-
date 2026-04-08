@@ -7,10 +7,10 @@ param(
 $ErrorActionPreference = "Stop"
 
 function Show-Phase([string]$text) {
-    Write-Host "[stop_stack] $text" -ForegroundColor Yellow
+    Write-Host "[stop] $text" -ForegroundColor Yellow
 }
 
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
 $LauncherExe = Join-Path $RepoRoot "Go_XIEXin.exe"
 $LauncherScript = Join-Path $RepoRoot "Launcher\Go_XIEXin.py"
 
@@ -62,7 +62,7 @@ if ($PythonOverride) {
 & $PythonPath @launcherArgs
 $exitCode = $LASTEXITCODE
 if ($exitCode -ne 0) {
-    Write-Host "[stop_stack] launcher stop failed exitCode=$exitCode" -ForegroundColor Red
+    Write-Host "[stop] launcher stop failed exitCode=$exitCode" -ForegroundColor Red
     exit $exitCode
 }
 Show-Phase "stack stop done"

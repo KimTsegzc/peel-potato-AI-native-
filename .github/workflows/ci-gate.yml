@@ -7,6 +7,7 @@ on:
       - main
       - master
       - xiexin-vite-proto
+      - agent-dev-*
 
 jobs:
   quality-gate:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 
@@ -10,6 +11,7 @@ class AgentRequest:
     model: str | None = None
     smooth: bool = True
     session_id: str | None = None
+    request_started_at: datetime | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

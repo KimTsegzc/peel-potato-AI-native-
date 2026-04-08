@@ -10,12 +10,12 @@ param(
 $ErrorActionPreference = "Stop"
 
 function Show-Phase([string]$text) {
-    Write-Host "[restart_stack] $text" -ForegroundColor Green
+    Write-Host "[restart] $text" -ForegroundColor Green
 }
 
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$StopScript = Join-Path $RepoRoot "Launcher\stop_stack.ps1"
-$StartScript = Join-Path $RepoRoot "Launcher\start_stack.ps1"
+$RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
+$StopScript  = Join-Path $RepoRoot "Launcher\Win\stop.ps1"
+$StartScript = Join-Path $RepoRoot "Launcher\Win\start.ps1"
 
 if (-not (Test-Path $StopScript)) {
     throw "Launcher stop script not found: $StopScript"
@@ -26,26 +26,14 @@ if (-not (Test-Path $StartScript)) {
 }
 
 $stopParams = @{ Port = $Port }
-if ($PythonOverride) {
-    $stopParams.PythonOverride = $PythonOverride
-}
-if ($UseLauncherExe) {
-    $stopParams.UseLauncherExe = $true
-}
+if ($PythonOverride)  { $stopParams.PythonOverride = $PythonOverride }
+if ($UseLauncherExe)  { $stopParams.UseLauncherExe = $true }
 
 $startParams = @{ Port = $Port }
-if ($PythonOverride) {
-    $startParams.PythonOverride = $PythonOverride
-}
-if ($NoBrowser) {
-    $startParams.NoBrowser = $true
-}
-if ($WeChat) {
-    $startParams.WeChat = $true
-}
-if ($UseLauncherExe) {
-    $startParams.UseLauncherExe = $true
-}
+if ($PythonOverride)  { $startParams.PythonOverride = $PythonOverride }
+if ($NoBrowser)       { $startParams.NoBrowser = $true }
+if ($WeChat)          { $startParams.WeChat = $true }
+if ($UseLauncherExe)  { $startParams.UseLauncherExe = $true }
 
 Show-Phase "stopping full stack on port $Port"
 & $StopScript @stopParams
