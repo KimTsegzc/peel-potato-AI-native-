@@ -4,15 +4,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$RepoRoot       = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
 $LauncherScript = Join-Path $RepoRoot "Launcher\Go_XIEXin.py"
-$SourceIconIco = Join-Path $RepoRoot "Launcher\Go_XIEXin.ico"
-$BuildRoot = Join-Path $RepoRoot ".build\pyinstaller"
-$BuildIconIco = Join-Path $BuildRoot "Go_XIEXin.multisize.ico"
-$PrimaryExe = Join-Path $RepoRoot "Go_XIEXin.exe"
-$FreshExe = Join-Path $RepoRoot "Go_XIEXin_fresh.exe"
-$WorkDir = Join-Path $BuildRoot "work"
-$SpecDir = Join-Path $BuildRoot "spec"
+$SourceIconIco  = Join-Path $RepoRoot "Launcher\Go_XIEXin.ico"
+$BuildRoot      = Join-Path $RepoRoot ".build\pyinstaller"
+$BuildIconIco   = Join-Path $BuildRoot "Go_XIEXin.multisize.ico"
+$PrimaryExe     = Join-Path $RepoRoot "Go_XIEXin.exe"
+$FreshExe       = Join-Path $RepoRoot "Go_XIEXin_fresh.exe"
+$WorkDir        = Join-Path $BuildRoot "work"
+$SpecDir        = Join-Path $BuildRoot "spec"
 
 function Find-Python {
     if ($PythonOverride -and (Test-Path $PythonOverride)) {
@@ -50,8 +50,8 @@ if (-not (Test-Path $SourceIconIco)) {
 }
 
 New-Item -ItemType Directory -Force -Path $BuildRoot | Out-Null
-New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
-New-Item -ItemType Directory -Force -Path $SpecDir | Out-Null
+New-Item -ItemType Directory -Force -Path $WorkDir   | Out-Null
+New-Item -ItemType Directory -Force -Path $SpecDir   | Out-Null
 
 & $PythonPath -c "from pathlib import Path; from PIL import Image; src = Path(r'$SourceIconIco'); dst = Path(r'$BuildIconIco'); img = Image.open(src).convert('RGBA'); dst.parent.mkdir(parents=True, exist_ok=True); img.save(dst, format='ICO', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
 
