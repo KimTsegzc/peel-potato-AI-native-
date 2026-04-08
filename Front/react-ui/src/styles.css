@@ -357,6 +357,8 @@ textarea {
 
 .welcome-stack-shell {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -387,9 +389,12 @@ textarea {
 .hero-copy {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 100%;
   gap: 0;
   align-items: center;
   justify-content: center;
+  min-width: 0;
   min-height: calc(2 * 1.3em + 8px);
 }
 
@@ -405,10 +410,12 @@ textarea {
 
 .hero-title {
   margin: 0;
+  width: 100%;
   font-size: clamp(22px, 2.95vw, 42px);
   line-height: 1.08;
   font-weight: 700;
-  max-width: 920px;
+  max-width: min(920px, 100%);
+  min-width: 0;
   white-space: nowrap;
   text-align: center;
 }
@@ -923,12 +930,16 @@ textarea {
     left: 50%;
     bottom: var(--wechat-welcome-lock-bottom);
     width: min(var(--content-width), calc(var(--app-width-stable) - 20px));
+    max-width: calc(var(--app-width-stable) - 20px);
+    padding-bottom: calc(var(--welcome-mobile-composer-height) + clamp(8px, 1.6vh, 12px));
     transform: translateX(-50%);
+    overflow-x: clip;
     z-index: 6;
   }
 
   .app-shell.is-mobile-default.welcome-mode .welcome-stack-shell {
     width: min(var(--content-width), calc(var(--app-width-stable) - 24px));
+    padding-bottom: calc(var(--welcome-mobile-composer-height) + clamp(6px, 1.2vh, 10px));
   }
 
   .topbar {
@@ -1022,6 +1033,8 @@ textarea {
 
   .hero-panel {
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
     gap: 16px;
   }
 
@@ -1046,7 +1059,9 @@ textarea {
 
   .app-shell.is-wechat .hero-title,
   .app-shell.is-mobile-default .hero-title {
+    width: 100%;
     max-width: min(100%, calc(var(--app-width-stable) - 40px));
+    min-width: 0;
     letter-spacing: -0.02em;
     overflow-wrap: anywhere;
     word-break: break-word;
@@ -1228,17 +1243,20 @@ textarea {
 
   .app-shell.is-wechat.welcome-mode .composer-shell,
   .app-shell.is-mobile-default.welcome-mode .composer-shell {
-    position: static;
-    left: auto;
-    bottom: auto;
-    width: var(--welcome-mobile-composer-width);
-    margin-top: clamp(8px, 1.6vh, 12px);
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: calc(var(--keyboard-offset) + var(--composer-bottom));
+    width: auto;
+    margin-top: 0;
     transform: none;
-    z-index: 6;
+    transition: none;
+    z-index: 7;
   }
 
   .app-shell.is-mobile-default.welcome-mode .composer-shell {
-    margin-top: clamp(6px, 1.2vh, 10px);
+    left: 12px;
+    right: 12px;
   }
 
   .app-shell.is-wechat.welcome-mode .composer-box,
