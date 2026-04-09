@@ -88,6 +88,24 @@ function drawShareValue(ctx, content, x, y, maxWidth, contentFont, contentColor)
   return drawWrappedText(ctx, content, x, y + SHARE_LABEL_LINE_HEIGHT, maxWidth, SHARE_BODY_LINE_HEIGHT, 3) + 10;
 }
 
+function formatCommentTime(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  const year = String(date.getFullYear()).slice(-2);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}年${month}月${day}日 ${hours}:${minutes}`;
+}
+
 async function tryNativeWechatShare({ title, desc, link, imgUrl }) {
   function waitForBridge() {
     if (window.WeixinJSBridge?.invoke) {
@@ -294,6 +312,18 @@ export function SettingsControl({
   const shareImagePromiseRef = useRef(null);
   const sessionId = useMemo(() => getClientSessionId(), []);
   const likeCountText = likeCount > 99 ? "99+" : String(Math.max(0, likeCount));
+  const renderedComments = useMemo(
+    () => [
+      {
+        id: `${PROJECT_INFO_ID}-release-comment`,
+        user_name: "谢鑫",
+        created_at: PROJECT_INFO.releaseTime,
+        content: "感谢支持，欢迎大家多吐槽~",
+      },
+      ...comments,
+    ],
+    [comments],
+  );
 
   async function ensureShareImageUrl() {
     if (shareImageUrl) {
@@ -571,6 +601,7 @@ export function SettingsControl({
               <svg className="info-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M12 20.2c-.2 0-.4-.1-.6-.2C8.1 18 3 14.3 3 9.9 3 7.2 5.1 5 7.8 5c1.6 0 3.1.8 4.2 2.1C13 5.8 14.5 5 16.2 5 18.9 5 21 7.2 21 9.9c0 4.4-5.1 8.1-8.4 9.9-.2.1-.4.2-.6.2z" />
               </svg>
+              <span className="info-action-label">赞</span>
               <span className="info-action-count">{likeCountText}</span>
             </button>
             <button
@@ -584,22 +615,24 @@ export function SettingsControl({
                 <path d="M15 5l6 6-6 6" />
                 <path d="M21 11H9a6 6 0 0 0-6 6" />
               </svg>
+              <span className="info-action-label">转发</span>
             </button>
             <button type="button" className="info-action-button" onClick={handleFocusComment} aria-label="评论">
               <svg className="info-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M4 5h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-3H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" />
               </svg>
+              <span className="info-action-label">评论</span>
             </button>
           </div>
           <div className="info-comments" ref={commentsSectionRef}>
             <div className="info-meta-label">评论区</div>
             <div className="info-comment-list" aria-live="polite">
-              {comments.length ? (
-                comments.map((item) => (
+              {renderedComments.length ? (
+                renderedComments.map((item) => (
                   <div key={item.id || `${item.created_at}-${item.content}`} className="info-comment-item">
                     <div className="info-comment-head">
                       <span className="info-comment-user">{item.user_name || "匿名"}</span>
-                      <span className="info-comment-time">{item.created_at || ""}</span>
+                      <span className="info-comment-time">{formatCommentTime(item.created_at)}</span>
                     </div>
                     <div className="info-comment-content">{item.content}</div>
                   </div>
