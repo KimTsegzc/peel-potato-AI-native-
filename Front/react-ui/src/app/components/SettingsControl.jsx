@@ -563,7 +563,7 @@ export function SettingsControl({
                 {shareImageUrl ? <img className="info-share-full-image" src={shareImageUrl} alt="分享提示图预览" /> : null}
               </div>
               {isWechatClient ? (
-                <div className="info-share-full-note">长按图片保存</div>
+                <div className="info-share-full-note">长按转给朋友看看~</div>
               ) : (
                 <div className="info-share-full-actions">
                   <button type="button" className="info-share-button" onClick={handleDownloadShareImage}>
