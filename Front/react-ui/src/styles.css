@@ -717,17 +717,12 @@ textarea {
 }
 
 .info-comment-list {
-  max-height: min(24vh, 240px);
-  overflow-y: auto;
   border-radius: 12px;
   border: 0;
   background: transparent;
   padding: 0;
   display: grid;
   gap: 8px;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: #d1d5db transparent;
   min-width: 0;
 }
 
