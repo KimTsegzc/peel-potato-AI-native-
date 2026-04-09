@@ -318,12 +318,13 @@ textarea {
 
 .info-modal {
   width: min(80vw, calc(100vw - 28px));
-  height: min(80vh, calc(100vh - 28px));
+  max-height: min(80vh, calc(100vh - 28px));
+  height: auto;
   border: var(--line-width) solid var(--line);
   border-radius: 24px;
   background: #ffffff;
   box-shadow: var(--shadow-soft);
-  padding: 22px 22px 20px;
+  padding: 44px 44px 40px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -386,9 +387,10 @@ textarea {
 
 .info-modal-body {
   margin-top: 18px;
-  display: grid;
-  gap: 10px;
-  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -421,16 +423,20 @@ textarea {
 .info-meta-label {
   font-size: 16px;
   letter-spacing: 0.1em;
+  line-height: 1.68;
   font-weight: 600;
   text-transform: uppercase;
   color: var(--muted);
   font-family: "Avenir Next", "SF Pro Display", "Segoe UI Variable Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+  text-align: left;
 }
 
 .info-meta-value {
   font-size: 16px;
   line-height: 1.68;
   color: var(--ink);
+  text-align: left;
+  text-align-last: auto;
 }
 
 .info-feature-list {
@@ -441,6 +447,8 @@ textarea {
   font-size: 16px;
   line-height: 1.68;
   color: var(--ink);
+  text-align: left;
+  text-align-last: auto;
 }
 
 @media (orientation: landscape) {
@@ -453,7 +461,8 @@ textarea {
 @media (orientation: landscape) and (min-width: 901px) {
   .info-modal {
     width: min(50vw, calc(100vw - 48px));
-    height: min(80vh, calc(100vh - 40px));
+    max-height: min(80vh, calc(100vh - 40px));
+    height: auto;
   }
 }
 
@@ -1344,8 +1353,7 @@ textarea {
     padding: 12px var(--thread-scroll-gutter) var(--thread-content-tail-space) 2px;
   }
 
-  .app-shell.is-wechat.chat-mode,
-  .app-shell.is-mobile-default.chat-mode {
+  .app-shell.is-wechat.chat-mode {
     --chat-composer-height: 46px;
     position: fixed;
     inset: 0;
@@ -1354,9 +1362,18 @@ textarea {
     overflow: hidden;
   }
 
+  .app-shell.is-mobile-default.chat-mode {
+    --chat-composer-height: 46px;
+    position: fixed;
+    inset: 0;
+    min-height: var(--app-height);
+    height: var(--app-height);
+    overflow: hidden;
+  }
+
   .app-shell.is-mobile-default.chat-mode .chat-stage {
     margin-top: 0;
-    min-height: calc(var(--app-height-stable) - 8px);
+    min-height: calc(var(--app-height) - 8px);
   }
 
   .app-shell.is-wechat.chat-mode .topbar-avatar,
@@ -1365,8 +1382,7 @@ textarea {
     height: 55px;
   }
 
-  .app-shell.is-wechat.chat-mode .composer-shell,
-  .app-shell.is-mobile-default.chat-mode .composer-shell {
+  .app-shell.is-wechat.chat-mode .composer-shell {
     position: absolute;
     left: 12px;
     right: 12px;
@@ -1374,10 +1390,22 @@ textarea {
     width: auto;
     transform: none;
     transition: none;
+    z-index: 30;
+  }
+
+  .app-shell.is-mobile-default.chat-mode .composer-shell {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: var(--composer-bottom);
+    width: auto;
+    transform: none;
+    transition: none;
+    z-index: 30;
   }
 
   .app-shell.is-mobile-default.chat-mode .chat-surface {
-    bottom: calc(var(--keyboard-offset) + var(--chat-composer-height) + var(--composer-bottom) + 6px);
+    bottom: calc(var(--chat-composer-height) + var(--composer-bottom) + 6px);
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
@@ -1399,16 +1427,26 @@ textarea {
     border-radius: 999px;
   }
 
-  .app-shell.is-wechat.chat-mode .chat-stage,
-  .app-shell.is-mobile-default.chat-mode .chat-stage {
+  .app-shell.is-wechat.chat-mode .chat-stage {
     margin-top: 0;
     min-height: var(--app-height-stable);
   }
 
-  .app-shell.is-wechat.chat-mode .chat-surface,
-  .app-shell.is-mobile-default.chat-mode .chat-surface {
+  .app-shell.is-mobile-default.chat-mode .chat-stage {
+    margin-top: 0;
+    min-height: var(--app-height);
+  }
+
+  .app-shell.is-wechat.chat-mode .chat-surface {
     top: calc(54px + 1%);
     bottom: calc(var(--keyboard-offset) + var(--thread-surface-offset));
+    padding-right: 12px;
+    padding-bottom: 0;
+  }
+
+  .app-shell.is-mobile-default.chat-mode .chat-surface {
+    top: calc(54px + 1%);
+    bottom: var(--thread-surface-offset);
     padding-right: 12px;
     padding-bottom: 0;
   }
@@ -1514,7 +1552,7 @@ textarea {
   }
 
   .info-modal {
-    padding: 16px 16px 14px;
+    padding: 32px 32px 28px;
     border-radius: 20px;
   }
 

@@ -92,7 +92,7 @@ export default function App() {
   const welcomeLockActive = mobileLikeWechat && !chatMode;
   const allowWelcomeAutoFocus = !mobileLikeWechat;
 
-  useViewportMetrics({ clientMode, isMobileViewport, welcomeLockActive });
+  useViewportMetrics({ clientMode, isMobileViewport, welcomeLockActive, chatMode });
   useDocumentFlags({ clientMode, appLockActive, welcomeLockActive });
   useAppScrollLock(appLockActive);
   useTextareaAutoSize(textareaRef, input);

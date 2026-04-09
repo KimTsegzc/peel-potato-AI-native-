@@ -12,7 +12,7 @@ function shouldUseViewportFreezeWindow() {
   return userAgent.includes("edga/") || userAgent.includes("edge/") || userAgent.includes("chrome/");
 }
 
-export function useViewportMetrics({ clientMode, isMobileViewport, welcomeLockActive }) {
+export function useViewportMetrics({ clientMode, isMobileViewport, welcomeLockActive, chatMode }) {
   const stableViewportHeightRef = useRef(0);
   const stableViewportWidthRef = useRef(0);
   const frameRef = useRef(0);
@@ -23,8 +23,9 @@ export function useViewportMetrics({ clientMode, isMobileViewport, welcomeLockAc
   useEffect(() => {
     const root = document.documentElement;
     const isMobileLikeWechat = clientMode === "wechat" || (clientMode === "default" && isMobileViewport);
-    const shouldTrackViewportScroll = !welcomeLockActive && !isMobileLikeWechat;
-    shouldFreezeRef.current = isMobileLikeWechat || shouldUseViewportFreezeWindow();
+    const isDefaultMobileChat = clientMode === "default" && isMobileViewport && chatMode;
+    const shouldTrackViewportScroll = !welcomeLockActive && (!isMobileLikeWechat || isDefaultMobileChat);
+    shouldFreezeRef.current = !chatMode && (isMobileLikeWechat || shouldUseViewportFreezeWindow());
 
     function writeViewportMetrics() {
       const viewport = window.visualViewport;
@@ -202,5 +203,5 @@ export function useViewportMetrics({ clientMode, isMobileViewport, welcomeLockAc
       document.removeEventListener("focusin", handleFocusIn, true);
       document.removeEventListener("focusout", handleFocusOut, true);
     };
-  }, [clientMode, isMobileViewport, welcomeLockActive]);
+  }, [chatMode, clientMode, isMobileViewport, welcomeLockActive]);
 }
