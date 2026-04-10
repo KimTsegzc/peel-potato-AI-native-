@@ -139,6 +139,47 @@ def _build_usage_tip() -> str:
     )
 
 
+def _explain_email_failure_with_llm(
+    *,
+    error_text: str,
+    receiver: str | None,
+    subject: str,
+    request: AgentRequest,
+) -> str | None:
+    raw_input = _strip_user_prefix(request.user_input)
+    metadata = request.metadata if isinstance(request.metadata, dict) else {}
+    system_prompt = (
+        "你是邮件发送失败解释助手。"
+        "请根据SMTP错误，给用户一个简洁中文解释。"
+        "输出2到4行："
+        "第1行写主要原因；"
+        "第2到4行给出可执行修复建议。"
+        "如果收件人不是完整邮箱（缺少@或域名），必须明确指出并给出示例。"
+        "不要输出JSON，不要编造成功发送结果。"
+    )
+    payload = {
+        "error": error_text,
+        "receiver": receiver,
+        "subject": subject,
+        "user_input": raw_input,
+        "metadata": metadata,
+    }
+    try:
+        response = LLMProvider.with_response_messages(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+            ],
+            model=_EMAIL_ADAPTER_MODEL,
+            enable_search=False,
+        )
+    except Exception:
+        return None
+
+    explanation = str(response.get("content", "") or "").strip()
+    return explanation or None
+
+
 class SendEmailSkill(BaseSkill):
     name = "send_email"
     display_name = "邮件发送"
@@ -203,17 +244,29 @@ class SendEmailSkill(BaseSkill):
                 receiver=receiver,
             )
         except EmailSenderError as exc:
+            failure_reason = str(exc)
+            llm_failure_explanation = _explain_email_failure_with_llm(
+                error_text=failure_reason,
+                receiver=receiver,
+                subject=subject,
+                request=request,
+            )
+            content = f"邮件发送失败：{failure_reason}"
+            if llm_failure_explanation:
+                content = f"邮件发送失败。\n{llm_failure_explanation}\n\n原始错误：{failure_reason}"
             return AgentResponse(
-                content=f"邮件发送失败：{exc}",
+                content=content,
                 metrics={
                     "skill": self.name,
                     "send_email": {
                         "ok": False,
-                        "reason": str(exc),
+                        "reason": failure_reason,
                         "receiver": receiver,
                         "subject": subject,
                         "llm_adapter_used": llm_adapter_used,
                         "llm_adapter_model": _EMAIL_ADAPTER_MODEL,
+                        "llm_failure_explainer_used": bool(llm_failure_explanation),
+                        "llm_failure_explainer_model": _EMAIL_ADAPTER_MODEL,
                     },
                 },
             )
