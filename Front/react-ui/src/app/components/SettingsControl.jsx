@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { PROJECT_INFO, PROJECT_INFO_ID } from "../constants";
+import { PROJECT_INFO, PROJECT_INFO_ID, PROJECT_SKILL_SET } from "../constants";
 import {
   commentInfo,
   fetchInfoReactions,
@@ -11,13 +11,18 @@ import {
 } from "../utils/api";
 
 const SHARE_CARD_WIDTH = 1080;
-const SHARE_CARD_HEIGHT = 1560;
+const SHARE_CARD_HEIGHT = 1720;
 const SHARE_QR_SIZE = 560;
 const SHARE_PADDING = 72;
 const SHARE_BODY_LINE_HEIGHT = 56;
 const SHARE_LABEL_LINE_HEIGHT = 56;
 const SHARE_QR_SHIFT = 40;
 const LIKE_COUNT_DISPLAY_BASE = 7;
+
+function buildShareProjectSummary() {
+  const skillSet = Array.isArray(PROJECT_SKILL_SET) ? PROJECT_SKILL_SET.filter(Boolean) : [];
+  return skillSet.join("\n").trim();
+}
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -29,24 +34,26 @@ function loadImage(src) {
 }
 
 function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines, align = "left") {
-  const words = String(text || "").split("");
+  const segments = String(text || "").split(/\r?\n/);
   const lines = [];
-  let currentLine = "";
 
-  words.forEach((word) => {
-    const candidate = `${currentLine}${word}`;
-    const width = ctx.measureText(candidate).width;
-    if (width <= maxWidth || !currentLine) {
-      currentLine = candidate;
-      return;
-    }
-    lines.push(currentLine);
-    currentLine = word;
+  segments.forEach((segment) => {
+    const chars = String(segment || "").split("");
+    let currentLine = "";
+
+    chars.forEach((char) => {
+      const candidate = `${currentLine}${char}`;
+      const width = ctx.measureText(candidate).width;
+      if (width <= maxWidth || !currentLine) {
+        currentLine = candidate;
+        return;
+      }
+      lines.push(currentLine);
+      currentLine = char;
+    });
+
+    lines.push(currentLine || " ");
   });
-
-  if (currentLine) {
-    lines.push(currentLine);
-  }
 
   const visibleLines = lines.slice(0, Math.max(1, maxLines));
   if (lines.length > visibleLines.length) {
@@ -192,6 +199,7 @@ async function createShareImageDataUrl() {
   const CONTENT_FONT = "500 44px 'Avenir Next', 'SF Pro Display', 'Segoe UI Variable Display', 'PingFang SC', 'Microsoft YaHei', sans-serif";
   const CONTENT_FONT_REGULAR = "400 44px 'Avenir Next', 'SF Pro Display', 'Segoe UI Variable Display', 'PingFang SC', 'Microsoft YaHei', sans-serif";
   const CAPTION_FONT = "600 32px 'Avenir Next', 'SF Pro Display', 'Segoe UI Variable Display', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+  const shareProjectSummary = buildShareProjectSummary();
 
   let cursorY = cardY + 90;
   ctx.fillStyle = LABEL_COLOR;
@@ -212,8 +220,8 @@ async function createShareImageDataUrl() {
 
   cursorY = drawShareSection(
     ctx,
-    "项目说明",
-    PROJECT_INFO.info,
+    "技能清单",
+    shareProjectSummary,
     contentX,
     cursorY,
     contentWidth,
@@ -328,6 +336,14 @@ export function SettingsControl({
     ],
     [comments],
   );
+
+  function closeInfoModal() {
+    if (sharePanelOpen) {
+      setSharePanelOpen(false);
+      return;
+    }
+    setInfoOpen(false);
+  }
 
   async function ensureShareImageUrl() {
     if (shareImageUrl) {
@@ -519,7 +535,7 @@ export function SettingsControl({
   }
 
   const infoModal = infoOpen ? (
-    <div className="info-modal-backdrop" role="presentation" onClick={() => setInfoOpen(false)}>
+    <div className="info-modal-backdrop" role="presentation" onClick={closeInfoModal}>
       <section
         className={`info-modal ${sharePanelOpen ? "is-share-only" : ""}`}
         role="dialog"
@@ -532,7 +548,7 @@ export function SettingsControl({
             <button
               type="button"
               className="info-modal-close"
-              onClick={() => setInfoOpen(false)}
+              onClick={closeInfoModal}
               aria-label="关闭项目信息"
             >
               <span />
@@ -548,7 +564,7 @@ export function SettingsControl({
             <button
               type="button"
               className="info-modal-close"
-              onClick={() => setInfoOpen(false)}
+              onClick={closeInfoModal}
               aria-label="关闭项目信息"
             >
               <span />
