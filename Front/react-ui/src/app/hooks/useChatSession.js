@@ -87,7 +87,7 @@ export function useChatSession({ apiBase, selectedModel }) {
       return [
         ...current,
         userMessage,
-        { role: "assistant", content: "正在连接服务...", metrics: null },
+        { role: "assistant", content: "正在连接服务...", metrics: null, pending: true },
       ];
     });
 
@@ -112,7 +112,7 @@ export function useChatSession({ apiBase, selectedModel }) {
               ? (activeSkillLabel ? `正在调用${activeSkillLabel}技能...` : "正在连接模型...")
               : "正在生成回复...";
             setMessages((current) => current.map((message, index) => (
-              index === assistantIndex ? { ...message, content: pulseText } : message
+              index === assistantIndex ? { ...message, content: pulseText, pending: true } : message
             )));
           }
 
@@ -125,14 +125,14 @@ export function useChatSession({ apiBase, selectedModel }) {
             }
             const skillHint = activeSkillLabel ? `正在调用${activeSkillLabel}技能...` : "正在调用技能...";
             setMessages((current) => current.map((message, index) => (
-              index === assistantIndex ? { ...message, content: skillHint } : message
+              index === assistantIndex ? { ...message, content: skillHint, pending: true } : message
             )));
           }
 
           if (eventPayload.type === "delta") {
             assistantText += eventPayload.content || "";
             setMessages((current) => current.map((message, index) => (
-              index === assistantIndex ? { ...message, content: assistantText } : message
+              index === assistantIndex ? { ...message, content: assistantText, pending: true } : message
             )));
           }
 
@@ -141,7 +141,7 @@ export function useChatSession({ apiBase, selectedModel }) {
             logContextMetrics(eventPayload.metrics || null);
             setMessages((current) => current.map((message, index) => (
               index === assistantIndex
-                ? { ...message, content: assistantText, metrics: eventPayload.metrics || null }
+                ? { ...message, content: assistantText, metrics: eventPayload.metrics || null, pending: false }
                 : message
             )));
           }
@@ -149,7 +149,7 @@ export function useChatSession({ apiBase, selectedModel }) {
           if (eventPayload.type === "error") {
             setMessages((current) => current.map((message, index) => (
               index === assistantIndex
-                ? { ...message, content: `请求失败：${eventPayload.message || "unknown error"}` }
+                ? { ...message, content: `请求失败：${eventPayload.message || "unknown error"}`, pending: false }
                 : message
             )));
           }
@@ -159,7 +159,7 @@ export function useChatSession({ apiBase, selectedModel }) {
       if (sessionVersionRef.current !== sessionVersion) return;
       setMessages((current) => current.map((message, index) => (
         index === assistantIndex
-          ? { ...message, content: `请求失败：${error.message || error}` }
+          ? { ...message, content: `请求失败：${error.message || error}`, pending: false }
           : message
       )));
     } finally {

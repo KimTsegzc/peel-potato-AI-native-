@@ -6,29 +6,12 @@ from typing import Any, Iterator
 
 from .... import LLMProvider
 from ....integrations.email_sender import EmailSender, EmailSenderError
-from ....integrations.search_provider import SearchProvider, SearchProviderError
 from ...contracts import AgentRequest, AgentResponse
 from ..base import BaseSkill
 
 
 _EMAIL_ADAPTER_MODEL = "qwen-turbo"
 _EMAIL_ADDRESS_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-_URL_RE = re.compile(r"https?://([^/\s]+)", re.IGNORECASE)
-_SEARCH_FIRST_HINTS = (
-    "最新",
-    "今天",
-    "昨日",
-    "昨天",
-    "近况",
-    "局势",
-    "新闻",
-    "行情",
-    "汇率",
-    "天气",
-    "市场",
-    "检索",
-    "搜索",
-)
 _MAIL_HISTORY_QUERY_RE = re.compile(r"已发送|发过.*邮件|邮件记录|邮件历史|我刚发了哪些邮件", re.IGNORECASE)
 
 
@@ -113,7 +96,6 @@ def _adapt_email_request_with_llm(request: AgentRequest) -> dict[str, str] | Non
         "JSON schema: {\"receiver\": string, \"subject\": string, \"body\": string}。"
         "如果缺少subject，请根据正文生成一个简短主题（例如：通知）。"
         "如果缺少body，请根据用户需求补全正文。"
-        "当用户要求整理天气、新闻、市场、行情、数据等信息时，请启用联网能力先补充有效内容，再写入body。"
         "禁止输出除JSON外的任何文字。"
     )
     user_payload = {
@@ -127,7 +109,7 @@ def _adapt_email_request_with_llm(request: AgentRequest) -> dict[str, str] | Non
                 {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
             ],
             model=_EMAIL_ADAPTER_MODEL,
-            enable_search=True,
+            enable_search=False,
         )
     except Exception:
         return None
@@ -152,169 +134,12 @@ def _build_usage_tip() -> str:
     return (
         "我可以直接帮你发邮件，再补一句就能发出：\n"
         "比如：发给 xiexin1.gd@ccb.com，主题“伊朗局势报告”，正文写昨天三点变化。\n"
-        "或者：给 xx@ccb.com 发会议提醒，说明明早9点五楼会议室。\n"
-        "如果你想先查资料再发，也可以说：先整理昨天伊朗局势，再发给 xx@ccb.com。"
+        "或者：给 xx@ccb.com 发会议提醒，说明明早9点五楼会议室。"
     )
 
 
 def _is_mail_history_query(text: str) -> bool:
     return bool(_MAIL_HISTORY_QUERY_RE.search(text or ""))
-
-
-def _extract_domains(text: str) -> list[str]:
-    domains = []
-    for match in _URL_RE.finditer(text or ""):
-        domain = (match.group(1) or "").strip().lower()
-        if domain and domain not in domains:
-            domains.append(domain)
-    return domains
-
-
-def _build_search_context(raw_input: str, *, web_top_k: int = 5) -> tuple[str | None, dict[str, Any]]:
-    try:
-        response = SearchProvider.web_search(
-            messages=[{"role": "user", "content": raw_input}],
-            web_top_k=web_top_k,
-            timeout=25.0,
-        )
-    except (SearchProviderError, RuntimeError, ValueError):
-        return None, {"provider_used": True, "provider_ok": False, "results_count": 0}
-
-    results = response.get("search_results") if isinstance(response, dict) else None
-    if not isinstance(results, list) or not results:
-        return None, {"provider_used": True, "provider_ok": True, "results_count": 0}
-
-    lines: list[str] = []
-    for item in results[:web_top_k]:
-        if not isinstance(item, dict):
-            continue
-        title = str(item.get("title") or "").strip()
-        summary = str(item.get("snippet") or item.get("summary") or item.get("content") or "").strip()
-        url = str(item.get("url") or item.get("link") or "").strip()
-        piece = f"标题：{title or '未命名'}\n摘要：{summary or '无'}"
-        if url:
-            piece += f"\n来源：{url}"
-        lines.append(piece)
-
-    context = "\n\n".join(lines).strip() or None
-    return context, {
-        "provider_used": True,
-        "provider_ok": True,
-        "results_count": len(results),
-    }
-
-
-def _needs_search_first(request: AgentRequest, subject: str, body: str) -> bool:
-    metadata = request.metadata if isinstance(request.metadata, dict) else {}
-    email_meta = metadata.get("email") if isinstance(metadata.get("email"), dict) else {}
-
-    meta_flag = email_meta.get("search_first")
-    if meta_flag is None:
-        meta_flag = metadata.get("search_first")
-    if isinstance(meta_flag, bool):
-        return meta_flag
-    if isinstance(meta_flag, str):
-        normalized = meta_flag.strip().lower()
-        if normalized in {"1", "true", "yes", "on"}:
-            return True
-        if normalized in {"0", "false", "no", "off"}:
-            return False
-
-    raw = _strip_user_prefix(request.user_input)
-    if any(hint in raw for hint in _SEARCH_FIRST_HINTS):
-        return True
-
-    # 内容过短时优先触发搜索增强，避免"发出去了但信息太空"。
-    if len((body or "").strip()) < 60:
-        return True
-
-    # 默认开启搜索优先，可通过 metadata.search_first=false 关闭。
-    return True
-
-
-def _enrich_email_with_search(
-    *,
-    request: AgentRequest,
-    receiver: str | None,
-    subject: str,
-    body: str,
-) -> tuple[dict[str, str] | None, dict[str, Any]]:
-    metadata = request.metadata if isinstance(request.metadata, dict) else {}
-    raw_input = _strip_user_prefix(request.user_input)
-    search_context, search_meta = _build_search_context(raw_input)
-    system_prompt = (
-        "你是邮件内容增强助手。"
-        "请根据用户请求生成可直接发送的邮件正文。"
-        "若提供了外部检索摘要，必须优先使用该摘要并保留关键事实。"
-        "若没有检索摘要，可自行联网检索并在正文中带上来源链接。"
-        "JSON schema: {\"subject\": string, \"body\": string}。"
-        "要求：主题简洁；正文结构清晰、可直接发送；至少包含2条具体事实；"
-        "如果用户已给出明确正文，仅做轻量补充，不要改写核心意图。"
-        "不要使用‘根据最新消息’这类空泛措辞，不要输出占位语。"
-        "禁止输出JSON以外的内容。"
-    )
-    payload = {
-        "user_input": raw_input,
-        "metadata": metadata,
-        "receiver": receiver,
-        "subject": subject,
-        "body": body,
-        "search_context": search_context,
-    }
-    try:
-        response = LLMProvider.with_response_messages(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-            ],
-            model=_EMAIL_ADAPTER_MODEL,
-            enable_search=True,
-        )
-    except Exception:
-        return None, {
-            **search_meta,
-            "model_search_fallback": True,
-            "search_domains": [],
-        }
-
-    parsed = _extract_json_payload(str(response.get("content", "") or ""))
-    if not parsed:
-        return None, {
-            **search_meta,
-            "model_search_fallback": True,
-            "search_domains": [],
-        }
-
-    enriched_subject = str(parsed.get("subject") or "").strip()
-    enriched_body = str(parsed.get("body") or parsed.get("content") or "").strip()
-    if not enriched_subject and not enriched_body:
-        return None, {
-            **search_meta,
-            "model_search_fallback": True,
-            "search_domains": [],
-        }
-
-    domains = _extract_domains(enriched_body)
-    # 没有外部搜索上下文且正文里也没有来源链接时，视为低置信度检索结果。
-    if search_context is None and not domains:
-        return None, {
-            **search_meta,
-            "model_search_fallback": True,
-            "search_domains": [],
-            "quality_gate_rejected": True,
-        }
-
-    return (
-        {
-            "subject": enriched_subject,
-            "body": enriched_body,
-        },
-        {
-            **search_meta,
-            "model_search_fallback": search_context is None,
-            "search_domains": domains,
-        },
-    )
 
 
 def _explain_email_failure_with_llm(
@@ -405,14 +230,6 @@ class SendEmailSkill(BaseSkill):
             receiver = _extract_receiver_from_text(raw_input)
 
         llm_adapter_used = False
-        llm_search_enricher_used = False
-        llm_search_meta: dict[str, Any] = {
-            "provider_used": False,
-            "provider_ok": False,
-            "results_count": 0,
-            "model_search_fallback": False,
-            "search_domains": [],
-        }
         if not subject or not body:
             adapted = _adapt_email_request_with_llm(request)
             if adapted:
@@ -423,19 +240,6 @@ class SendEmailSkill(BaseSkill):
                     body = str(adapted.get("body") or "").strip()
                 if not receiver:
                     receiver = str(adapted.get("receiver") or "").strip() or None
-
-        if subject and body and _needs_search_first(request, subject, body):
-            enriched, enrich_meta = _enrich_email_with_search(
-                request=request,
-                receiver=receiver,
-                subject=subject,
-                body=body,
-            )
-            llm_search_meta = {**llm_search_meta, **enrich_meta}
-            if enriched:
-                llm_search_enricher_used = True
-                subject = str(enriched.get("subject") or subject).strip() or subject
-                body = str(enriched.get("body") or body).strip() or body
 
         if not subject or not body:
             return AgentResponse(
@@ -448,12 +252,7 @@ class SendEmailSkill(BaseSkill):
                         "receiver": receiver,
                         "llm_adapter_used": llm_adapter_used,
                         "llm_adapter_model": _EMAIL_ADAPTER_MODEL,
-                        "llm_search_enricher_used": llm_search_enricher_used,
-                        "llm_search_enricher_model": _EMAIL_ADAPTER_MODEL,
-                        "search_provider_used": llm_search_meta.get("provider_used"),
-                        "search_provider_ok": llm_search_meta.get("provider_ok"),
-                        "search_results_count": llm_search_meta.get("results_count"),
-                        "search_domains": llm_search_meta.get("search_domains"),
+                        "implementation_hint": "大模型汇总（搜索未接入）",
                     },
                 },
             )
@@ -486,12 +285,7 @@ class SendEmailSkill(BaseSkill):
                         "subject": subject,
                         "llm_adapter_used": llm_adapter_used,
                         "llm_adapter_model": _EMAIL_ADAPTER_MODEL,
-                        "llm_search_enricher_used": llm_search_enricher_used,
-                        "llm_search_enricher_model": _EMAIL_ADAPTER_MODEL,
-                        "search_provider_used": llm_search_meta.get("provider_used"),
-                        "search_provider_ok": llm_search_meta.get("provider_ok"),
-                        "search_results_count": llm_search_meta.get("results_count"),
-                        "search_domains": llm_search_meta.get("search_domains"),
+                        "implementation_hint": "大模型汇总（搜索未接入）",
                         "llm_failure_explainer_used": bool(llm_failure_explanation),
                         "llm_failure_explainer_model": _EMAIL_ADAPTER_MODEL,
                     },
@@ -519,12 +313,7 @@ class SendEmailSkill(BaseSkill):
                     "smtp_port": result.get("smtp_port"),
                     "llm_adapter_used": llm_adapter_used,
                     "llm_adapter_model": _EMAIL_ADAPTER_MODEL,
-                    "llm_search_enricher_used": llm_search_enricher_used,
-                    "llm_search_enricher_model": _EMAIL_ADAPTER_MODEL,
-                    "search_provider_used": llm_search_meta.get("provider_used"),
-                    "search_provider_ok": llm_search_meta.get("provider_ok"),
-                    "search_results_count": llm_search_meta.get("results_count"),
-                    "search_domains": llm_search_meta.get("search_domains"),
+                    "implementation_hint": "大模型汇总（搜索未接入）",
                 },
             },
         )

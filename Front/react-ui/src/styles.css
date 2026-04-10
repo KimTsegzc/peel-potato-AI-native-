@@ -1283,6 +1283,37 @@ textarea {
   font-size: 0.92em;
 }
 
+.message-loading-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.message-loading-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  border-top-color: #111111;
+  animation: message-spin 0.85s linear infinite;
+}
+
+.message-loading-text {
+  letter-spacing: 0.2px;
+}
+
+@keyframes message-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .message-meta {
   margin-top: 5px;
   font-size: 11px;
