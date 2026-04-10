@@ -33,7 +33,7 @@ fi
 for path in \
   "$ROOT_DIR/orchestrator.py" \
   "$ROOT_DIR/pyproject.toml" \
-  "$ROOT_DIR/Backend/llm_provider.py" \
+  "$ROOT_DIR/Backend/integrations/llm_provider.py" \
   "$FRONTEND_DIR/package.json"
  do
   [[ -f "$path" ]] || fail "Required file missing: $path"

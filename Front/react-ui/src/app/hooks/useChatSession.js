@@ -92,6 +92,8 @@ export function useChatSession({ apiBase, selectedModel }) {
     });
 
     let assistantText = "";
+    let activeSkillLabel = "";
+    let activeSkillName = "";
 
     try {
       await streamChatResponse({
@@ -106,9 +108,24 @@ export function useChatSession({ apiBase, selectedModel }) {
           }
 
           if (eventPayload.type === "pulse") {
-            const pulseText = eventPayload.stage === "accepted" ? "正在连接模型..." : "正在生成回复...";
+            const pulseText = eventPayload.stage === "accepted"
+              ? (activeSkillLabel ? `正在调用${activeSkillLabel}技能...` : "正在连接模型...")
+              : "正在生成回复...";
             setMessages((current) => current.map((message, index) => (
               index === assistantIndex ? { ...message, content: pulseText } : message
+            )));
+          }
+
+          if (eventPayload.type === "skill") {
+            activeSkillName = eventPayload?.skill?.name || "";
+            activeSkillLabel = eventPayload?.skill?.label || eventPayload?.skill?.name || "";
+            if (activeSkillName === "direct_chat" || activeSkillLabel === "通用对话") {
+                activeSkillLabel = "";
+                return;
+            }
+            const skillHint = activeSkillLabel ? `正在调用${activeSkillLabel}技能...` : "正在调用技能...";
+            setMessages((current) => current.map((message, index) => (
+              index === assistantIndex ? { ...message, content: skillHint } : message
             )));
           }
 

@@ -12,6 +12,7 @@ from ..contracts import AgentRequest, AgentResponse
 @dataclass(frozen=True, slots=True)
 class SkillDescriptor:
     name: str
+    display_name: str
     description: str
     routing_hints: tuple[str, ...] = ()
     avoid_hints: tuple[str, ...] = ()
@@ -19,7 +20,11 @@ class SkillDescriptor:
     manual_excerpt: str = ""
 
     def render_for_router(self) -> str:
-        parts = [f"技能名：{self.name}", f"用途：{self.description or '未说明'}"]
+        parts = [
+            f"技能名：{self.name}",
+            f"技能展示名：{self.display_name or self.name}",
+            f"用途：{self.description or '未说明'}",
+        ]
         if self.routing_hints:
             parts.append("适用场景：" + "；".join(self.routing_hints))
         if self.avoid_hints:
@@ -33,6 +38,7 @@ class SkillDescriptor:
 
 class BaseSkill(ABC):
     name: str
+    display_name: str = ""
     description: str = ""
     routing_hints: tuple[str, ...] = ()
     avoid_hints: tuple[str, ...] = ()
@@ -43,6 +49,7 @@ class BaseSkill(ABC):
         description = (self.description or inspect.getdoc(self.__class__) or "").strip()
         return SkillDescriptor(
             name=self.name,
+            display_name=(self.display_name or self.name).strip(),
             description=description,
             routing_hints=tuple(self.routing_hints),
             avoid_hints=tuple(self.avoid_hints),

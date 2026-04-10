@@ -11,12 +11,12 @@ export const MAX_PERSISTED_MESSAGES = 48;
 export const PROJECT_INFO = {
 	projectName: "谢鑫的智能体",
 	developer: "广分金科部",
-	version: "V12.2",
-	releaseTime: "2026-04-09T12:07:48+08:00",
+	version: "V13",
+	releaseTime: "2026-04-11T00:00:00+08:00",
 	features: [
-		"支持点赞、转发、评论互动，并接入后端持久化。",
-		"分享海报支持二维码预生成与直接保存图流程。",
+		"新增邮件发送技能链路：前端指令可路由到后端邮件能力。",
+		"新增技能调用可视化提示，并隐藏通用对话技能噪音展示。",
 	],
 	info: "面向工作场景的企业智能问答与信息检索助手。",
-	versionChange: "Info面板继续收口，统一操作与评论区样式。",
+	versionChange: "聚焦技能可观测性与邮件发送链路打通。",
 };

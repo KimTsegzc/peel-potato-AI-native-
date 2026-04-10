@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -13,6 +14,7 @@ from .skills.base import SkillDescriptor
 _ROUTER_PROMPT = (
     "你是智能体技能路由器。你的唯一任务是在已注册技能中选择一个最合适的技能。\n"
     "必须使用 tool calling 调用 select_skill，不能直接输出自然语言答案。\n"
+    "如果用户明确要求发送邮件、代发通知邮件、给某个邮箱发主题和正文，优先选择 send_email。\n"
     "如果问题是普通闲聊、开放问答、外部机构客服电话、外部保险公司、外部律师、监管热线、通用建议，优先选择 direct_chat。\n"
     "只有当用户明确在问行内内部职能分工、哪个部门/岗位/负责人承接、内部接口人、办公号码时，才选择 skill_ccb_get_handler。\n"
     "如果不确定，选择 direct_chat，不要冒进。\n\n"
@@ -83,6 +85,7 @@ def _default_skill_name(skills: SkillRegistry) -> str:
 @dataclass(frozen=True, slots=True)
 class RouteDecision:
     skill_name: str
+    skill_display_name: str
     source: str
     reason: str
     model: str | None = None
@@ -92,6 +95,7 @@ class RouteDecision:
     def metrics(self) -> dict[str, Any]:
         return {
             "selected_skill": self.skill_name,
+            "selected_skill_label": self.skill_display_name,
             "source": self.source,
             "reason": self.reason,
             "model": self.model,
@@ -100,14 +104,51 @@ class RouteDecision:
         }
 
 
+_SEND_EMAIL_INTENT_RE = re.compile(
+    r"发送?邮件|发邮件|邮件给|收件人|主题|正文|subject\s*[:=]|receiver\s*[:=]|\bto\s*[:=]",
+    re.IGNORECASE,
+)
+
+
+def _is_send_email_intent(request: AgentRequest) -> bool:
+    metadata = request.metadata if isinstance(request.metadata, dict) else {}
+    email_meta = metadata.get("email") if isinstance(metadata.get("email"), dict) else metadata
+    if isinstance(email_meta, dict):
+        if any(str(email_meta.get(key) or "").strip() for key in ("receiver", "to", "subject", "body", "content")):
+            return True
+
+    normalized = _normalize_user_input(request.user_input)
+    return bool(_SEND_EMAIL_INTENT_RE.search(normalized))
+
+
+def _resolve_skill_display_name(descriptor_map: dict[str, SkillDescriptor], skill_name: str) -> str:
+    descriptor = descriptor_map.get(skill_name)
+    if descriptor is None:
+        return skill_name
+    return descriptor.display_name or skill_name
+
+
 class SkillRouter:
     def select_skill(self, request: AgentRequest, skills: SkillRegistry) -> RouteDecision:
         settings = get_settings()
         default_skill = _default_skill_name(skills)
         descriptors = skills.descriptors()
+        descriptor_map = {descriptor.name: descriptor for descriptor in descriptors}
+        default_skill_display_name = _resolve_skill_display_name(descriptor_map, default_skill)
+
+        # Deterministic fast-path for action-like email requests to avoid LLM pretending it sent email.
+        if "send_email" in set(skills.names()) and _is_send_email_intent(request):
+            return RouteDecision(
+                skill_name="send_email",
+                skill_display_name=_resolve_skill_display_name(descriptor_map, "send_email"),
+                source="rule_send_email",
+                reason="deterministic_email_intent",
+            )
+
         if len(descriptors) <= 1:
             return RouteDecision(
                 skill_name=default_skill,
+                skill_display_name=default_skill_display_name,
                 source="static",
                 reason="only_registered_skill",
             )
@@ -115,6 +156,7 @@ class SkillRouter:
         if not settings.skill_routing_enabled or not settings.api_key:
             return self._fallback_decision(
                 default_skill=default_skill,
+                default_skill_display_name=default_skill_display_name,
                 reason="router_disabled_or_missing_api_key",
             )
 
@@ -129,6 +171,7 @@ class SkillRouter:
         except Exception as exc:
             return self._fallback_decision(
                 default_skill=default_skill,
+                default_skill_display_name=default_skill_display_name,
                 reason=f"router_exception:{exc}",
             )
 
@@ -136,12 +179,14 @@ class SkillRouter:
         if not selected_skill or selected_skill not in set(skills.names()):
             return self._fallback_decision(
                 default_skill=default_skill,
+                default_skill_display_name=default_skill_display_name,
                 reason="router_invalid_selection",
                 llm_metrics=response.get("metrics", {}),
             )
 
         return RouteDecision(
             skill_name=selected_skill,
+            skill_display_name=_resolve_skill_display_name(descriptor_map, selected_skill),
             source="llm_tool_call",
             reason=reason or "router_selected_skill",
             model=settings.skill_router_model,
@@ -167,11 +212,13 @@ class SkillRouter:
         self,
         *,
         default_skill: str,
+        default_skill_display_name: str,
         reason: str,
         llm_metrics: dict[str, Any] | None = None,
     ) -> RouteDecision:
         return RouteDecision(
             skill_name=default_skill,
+            skill_display_name=default_skill_display_name,
             source="fallback_default",
             reason=reason,
             model=None,

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "xiexin-da-agent"
-version = "12.2.0"
+version = "13.0.0"
 requires-python = ">=3.10"
 dependencies = [
     "openai>=1.14,<2.0",
@@ -20,7 +20,7 @@ path = ".venv311"
 packages = ["Backend", "apps", "Prompt"]
 
 [tool.hatch.envs.default.scripts]
-back-llm-provider = "python -m Backend.llm_provider"
+back-llm-provider = "python -m Backend.integrations.llm_provider"
 back-ali-test = "python -m Backend.ali_test"
 
 [tool.xiexin]

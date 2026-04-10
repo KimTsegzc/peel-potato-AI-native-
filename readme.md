@@ -1,13 +1,16 @@
 # XIEXin DA Agent
 
-Version: 12.2.0
+Version: 13.0.0
 
 XIEXin DA Agent 是一个面向数据分析工作流的轻量 AI Agent 项目：后端提供流式 LLM 接口，前端提供桌面 / 移动 / 微信兼容聊天界面，部署链路基于 Ubuntu + systemd + nginx，并已接入基础 CI/CD。
 
 ## 当前主体架构
 
 - `apps/api/server.py`：统一 HTTP 入口，提供 `/health`、`/api/frontend-config`、`/api/chat`、`/api/chat/stream`
-- `Backend`：模型配置、LLM 调用、流式输出、运行时参数读取（`.env`）
+- `Backend/features`：APP 功能层，负责会话上下文、互动状态等产品功能实现
+- `Backend/runtime`：智能体运行时与技能编排
+- `Backend/integrations`：LLM、搜索、邮件以及后续文件/TTS 等外部能力接入
+- `Backend/settings.py`：运行时配置与 capability accessors
 - `Prompt`：Prompt 工程目录（`soul.md` 与欢迎语生成）
 - `Front/react-ui`：React + Vite 前端，支持桌面、移动默认端、微信端三套壳层
 - `Deployer`：Ubuntu 部署脚本、systemd 模板、nginx 模板、健康检查
@@ -33,7 +36,11 @@ XIEXin DA Agent 是一个面向数据分析工作流的轻量 AI Agent 项目：
 
 ```text
 .
-├─ Backend/              # LLM provider、settings、测试入口
+├─ Backend/
+│  ├─ features/         # APP 功能层（会话上下文、互动状态等）
+│  ├─ runtime/          # 智能体编排层
+│  ├─ integrations/     # 外部能力接入层
+│  └─ settings.py       # 配置入口
 ├─ Prompt/               # Prompt 工程（soul.md / welcome.py）
 ├─ Front/react-ui/       # React 前端
 ├─ Deployer/             # Ubuntu 部署脚本与模板
@@ -66,5 +73,5 @@ XIEXin DA Agent 是一个面向数据分析工作流的轻量 AI Agent 项目：
 
 ## 发布说明
 
-- 版本详情见 [Docs/release/release-12.2.md](Docs/release/release-12.2.md)
-- 当前发布目标：`main` + tag `V12.2`
+- 版本详情见 [Docs/release/release-13.0.md](Docs/release/release-13.0.md)
+- 当前发布目标：`main` + tag `V13`

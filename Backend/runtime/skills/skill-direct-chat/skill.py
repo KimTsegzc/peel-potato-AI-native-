@@ -2,17 +2,18 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from ... import LLMProvider
-from ...conversation_context import finalize_conversation, prepare_conversation
-from ...settings import get_settings
-from ..contracts import AgentRequest, AgentResponse
-from .base import BaseSkill
+from .... import LLMProvider
+from ....features.conversation_context import finalize_conversation, prepare_conversation
+from ....settings import get_settings
+from ...contracts import AgentRequest, AgentResponse
+from ..base import BaseSkill
 
 
 class DirectChatSkill(BaseSkill):
     """Compatibility skill that forwards directly to the existing LLM provider."""
 
     name = "direct_chat"
+    display_name = "通用对话"
     description = "通用对话兜底技能，处理闲聊、开放问答以及不属于专门业务技能的问题。"
     routing_hints = (
         "普通闲聊、问候、开放式问答",
@@ -27,7 +28,7 @@ class DirectChatSkill(BaseSkill):
         "客户咨询保险业务找谁",
         "今天几点了",
     )
-    manual_relpath = "direct_chat.SKILL.md"
+    manual_relpath = "SKILL.md"
 
     def run_stream(self, request: AgentRequest) -> Iterator[dict]:
         settings = get_settings()

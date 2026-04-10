@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
@@ -150,6 +151,42 @@ class Settings(BaseSettings):
             "QIANFAN_TIMEOUT_SECONDS",
         ),
     )
+    email_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("EMAIL_ENABLED"),
+    )
+    email_smtp_host: str = Field(
+        default="smtp.qq.com",
+        validation_alias=AliasChoices("EMAIL_SMTP_HOST", "SMTP_HOST"),
+    )
+    email_smtp_port: int = Field(
+        default=465,
+        validation_alias=AliasChoices("EMAIL_SMTP_PORT", "SMTP_PORT"),
+    )
+    email_use_ssl: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("EMAIL_USE_SSL", "SMTP_USE_SSL"),
+    )
+    email_use_starttls: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("EMAIL_USE_STARTTLS", "SMTP_USE_STARTTLS"),
+    )
+    email_sender: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("EMAIL_SENDER", "SMTP_SENDER", "EMAIL_USERNAME", "QQ_SENDER_EMAIL"),
+    )
+    email_auth_code: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("EMAIL_AUTH_CODE", "SMTP_AUTH_CODE", "EMAIL_PASSWORD", "QQ_MAIL_AUTH"),
+    )
+    email_default_receiver: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("EMAIL_DEFAULT_RECEIVER"),
+    )
+    email_timeout_seconds: float = Field(
+        default=15.0,
+        validation_alias=AliasChoices("EMAIL_TIMEOUT_SECONDS", "SMTP_TIMEOUT_SECONDS"),
+    )
 
     model_config = SettingsConfigDict(
         env_file=str(REPO_ROOT / ".env"),
@@ -165,3 +202,83 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+@dataclass(frozen=True, slots=True)
+class EmailSettings:
+    enabled: bool
+    smtp_host: str
+    smtp_port: int
+    use_ssl: bool
+    use_starttls: bool
+    sender: str | None
+    auth_code: str | None
+    default_receiver: str | None
+    timeout_seconds: float
+
+
+@dataclass(frozen=True, slots=True)
+class LLMSettings:
+    api_key: str | None
+    base_url: str
+    model: str
+    temperature: float | None
+    top_p: float | None
+    max_tokens: int | None
+    enable_search: bool
+    skill_routing_enabled: bool
+    skill_router_model: str
+    summary_enabled: bool
+    summary_model: str
+    summary_temperature: float
+    summary_max_tokens: int
+
+
+@dataclass(frozen=True, slots=True)
+class SearchSettings:
+    api_key: str | None
+    base_url: str
+    timeout_seconds: float
+
+
+def get_email_settings(settings: Settings | None = None) -> EmailSettings:
+    resolved_settings = settings or get_settings()
+    return EmailSettings(
+        enabled=bool(resolved_settings.email_enabled),
+        smtp_host=resolved_settings.email_smtp_host,
+        smtp_port=int(resolved_settings.email_smtp_port),
+        use_ssl=bool(resolved_settings.email_use_ssl),
+        use_starttls=bool(resolved_settings.email_use_starttls),
+        sender=resolved_settings.email_sender,
+        auth_code=resolved_settings.email_auth_code,
+        default_receiver=resolved_settings.email_default_receiver,
+        timeout_seconds=float(resolved_settings.email_timeout_seconds),
+    )
+
+
+def get_llm_settings(settings: Settings | None = None) -> LLMSettings:
+    resolved_settings = settings or get_settings()
+    return LLMSettings(
+        api_key=resolved_settings.api_key,
+        base_url=resolved_settings.base_url,
+        model=resolved_settings.model,
+        temperature=resolved_settings.temperature,
+        top_p=resolved_settings.top_p,
+        max_tokens=resolved_settings.max_tokens,
+        enable_search=bool(resolved_settings.llm_enable_search),
+        skill_routing_enabled=bool(resolved_settings.skill_routing_enabled),
+        skill_router_model=resolved_settings.skill_router_model,
+        summary_enabled=bool(resolved_settings.summary_enabled),
+        summary_model=resolved_settings.summary_model,
+        summary_temperature=resolved_settings.summary_temperature,
+        summary_max_tokens=resolved_settings.summary_max_tokens,
+    )
+
+
+def get_search_settings(settings: Settings | None = None) -> SearchSettings:
+    resolved_settings = settings or get_settings()
+    return SearchSettings(
+        api_key=resolved_settings.baidu_search_api_key,
+        base_url=resolved_settings.baidu_search_base_url,
+        timeout_seconds=float(resolved_settings.baidu_search_timeout_seconds),
+    )

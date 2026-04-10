@@ -5,7 +5,7 @@ from typing import Iterator
 from .contracts import AgentRequest, AgentResponse
 from .registry import SkillRegistry, ToolRegistry
 from .router import RouteDecision, SkillRouter
-from .skills import CCBGetHandlerSkill, DirectChatSkill
+from .skills import CCBGetHandlerSkill, DirectChatSkill, SendEmailSkill
 
 
 class AgentRuntime:
@@ -19,6 +19,7 @@ class AgentRuntime:
 
     def _bootstrap_defaults(self) -> None:
         self.skills.register(CCBGetHandlerSkill())
+        self.skills.register(SendEmailSkill())
         self.skills.register(DirectChatSkill())
 
     def _select_route(self, request: AgentRequest) -> RouteDecision:
@@ -27,6 +28,19 @@ class AgentRuntime:
     def run_stream(self, request: AgentRequest) -> Iterator[dict]:
         decision = self._select_route(request)
         skill = self.skills.get(decision.skill_name)
+        yield {
+            "type": "skill",
+            "stage": "selected",
+            "skill": {
+                "name": decision.skill_name,
+                "label": decision.skill_display_name,
+            },
+            "routing": {
+                "source": decision.source,
+                "reason": decision.reason,
+                "fallback_used": decision.fallback_used,
+            },
+        }
         for event in skill.run_stream(request):
             if event.get("type") == "done":
                 metrics = dict(event.get("metrics", {}))

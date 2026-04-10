@@ -23,10 +23,8 @@ def _ensure_repo_root_on_path_for_direct_run() -> None:
 
 
 _ensure_repo_root_on_path_for_direct_run()
-from Backend.llm_provider import get_model_list
-from Backend.search_provider import SearchProvider
-from Backend.conversation_context import normalize_session_id
-from Backend.info_reactions import add_comment, add_like, get_reactions, normalize_info_id, remove_like
+from Backend.features import add_comment, add_like, get_reactions, normalize_info_id, normalize_session_id, remove_like
+from Backend.integrations import SearchProvider, get_model_list
 from Backend.runtime import get_runtime
 from Backend.runtime.contracts import AgentRequest
 from Backend.settings import get_settings
@@ -206,6 +204,7 @@ def ask_stream(
     smooth: bool = True,
     session_id: str | None = None,
     request_started_at: datetime | None = None,
+    metadata: dict | None = None,
 ) -> Iterator[dict]:
     """Stream ask entrypoint for backend integration."""
     normalized_input = _normalize_user_input(user_input)
@@ -217,6 +216,7 @@ def ask_stream(
             smooth=smooth,
             session_id=normalize_session_id(session_id),
             request_started_at=request_started_at or datetime.now(),
+            metadata=dict(metadata or {}),
         )
     )
 
@@ -226,6 +226,7 @@ def ask_with_metrics(
     model: Optional[str] = None,
     session_id: str | None = None,
     request_started_at: datetime | None = None,
+    metadata: dict | None = None,
 ) -> tuple[str, dict]:
     """Non-streaming ask entrypoint for fallback-style frontend calls."""
     normalized_input = _normalize_user_input(user_input)
@@ -237,6 +238,7 @@ def ask_with_metrics(
             smooth=True,
             session_id=normalize_session_id(session_id),
             request_started_at=request_started_at or datetime.now(),
+            metadata=dict(metadata or {}),
         )
     )
     return response.content, response.metrics
@@ -508,6 +510,7 @@ def _build_handler():
                     user_input = payload.get("user_input", "")
                     model = payload.get("model")
                     session_id = normalize_session_id(payload.get("session_id"))
+                    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
                     request_started_at = datetime.now()
                     debug_requested = _is_global_debug_enabled(
                         debug_requested=(
@@ -527,6 +530,7 @@ def _build_handler():
                             "session_id": session_id,
                             "request_started_at": request_started_at.isoformat(timespec="seconds"),
                             "user_input": user_input,
+                            "metadata": metadata,
                         }
                         _debug_print("chat.request", debug_request)
                         for event in ask_stream(
@@ -535,6 +539,7 @@ def _build_handler():
                             smooth=True,
                             session_id=session_id,
                             request_started_at=request_started_at,
+                            metadata=metadata,
                         ):
                             debug_trace_events.append(event)
                             _debug_print("chat.event", event)
@@ -547,6 +552,7 @@ def _build_handler():
                             model=model,
                             session_id=session_id,
                             request_started_at=request_started_at,
+                            metadata=metadata,
                         )
 
                     response_payload = {
@@ -586,6 +592,7 @@ def _build_handler():
                 model = payload.get("model")
                 smooth = payload.get("smooth", True)
                 session_id = normalize_session_id(payload.get("session_id"))
+                metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
                 request_started_at = datetime.now()
                 debug_requested = _is_global_debug_enabled(
                     debug_requested=(
@@ -605,6 +612,7 @@ def _build_handler():
                         "session_id": session_id,
                         "request_started_at": request_started_at.isoformat(timespec="seconds"),
                         "user_input": user_input,
+                        "metadata": metadata,
                     }
                     _debug_print("stream.request", debug_request)
                     self._write_ndjson_event(
@@ -621,6 +629,7 @@ def _build_handler():
                     smooth=smooth,
                     session_id=session_id,
                     request_started_at=request_started_at,
+                    metadata=metadata,
                 ):
                     if debug_requested:
                         _debug_print("stream.event", event)

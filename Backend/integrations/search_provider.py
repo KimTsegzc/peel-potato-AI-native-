@@ -14,7 +14,7 @@ def _ensure_repo_root_on_path_for_direct_run() -> None:
     """Allow direct file execution without breaking package imports."""
     if __package__ not in (None, ""):
         return
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
     repo_root_str = str(repo_root)
     if repo_root_str not in sys.path:
         sys.path.insert(0, repo_root_str)
@@ -23,11 +23,11 @@ def _ensure_repo_root_on_path_for_direct_run() -> None:
 _ensure_repo_root_on_path_for_direct_run()
 
 if __package__ in (None, ""):
-    from Backend.settings import Settings, get_settings
+    from Backend.settings import SearchSettings, get_search_settings, get_settings
 else:
-    from .settings import Settings, get_settings
+    from ..settings import SearchSettings, get_search_settings, get_settings
 
-# F5 direct-debug defaults (edit these quickly when debugging).
+
 DEBUG_DEFAULT_USER_INPUT = "大盘情况。"
 DEBUG_DEFAULT_MESSAGES_JSON = ""
 DEBUG_DEFAULT_TIMEOUT_SECONDS = 90.0
@@ -70,8 +70,8 @@ def _try_parse_json(text: str) -> dict[str, Any] | None:
     return obj if isinstance(obj, dict) else None
 
 
-def _resolve_search_api_key(settings: Settings) -> str:
-    api_key = (settings.baidu_search_api_key or "").strip()
+def _resolve_search_api_key(search_settings: SearchSettings) -> str:
+    api_key = (search_settings.api_key or "").strip()
     if not api_key:
         raise RuntimeError(
             "Missing API key. Set BAIDU_QIANFAN_API_KEY (or QIANFAN_API_KEY / BAIDU_API_KEY) in the environment or .env."
@@ -79,8 +79,8 @@ def _resolve_search_api_key(settings: Settings) -> str:
     return api_key
 
 
-def _build_search_endpoint(settings: Settings) -> str:
-    base_url = (settings.baidu_search_base_url or "").rstrip("/")
+def _build_search_endpoint(search_settings: SearchSettings) -> str:
+    base_url = (search_settings.base_url or "").rstrip("/")
     if not base_url:
         raise RuntimeError("Invalid BAIDU_SEARCH_BASE_URL: empty value")
     return f"{base_url}/v2/ai_search/web_search"
@@ -169,10 +169,10 @@ def baidu_web_search(
     web_top_k: int | None = None,
     timeout: Optional[float] = None,
 ) -> dict[str, Any]:
-    """Call Baidu Qianfan web search API (/v2/ai_search/web_search)."""
     settings = get_settings()
-    api_key = _resolve_search_api_key(settings)
-    endpoint = _build_search_endpoint(settings)
+    search_settings = get_search_settings(settings)
+    api_key = _resolve_search_api_key(search_settings)
+    endpoint = _build_search_endpoint(search_settings)
 
     payload: dict[str, Any] = {
         "messages": _normalize_messages(messages=messages, user_input=user_input),
@@ -187,11 +187,7 @@ def baidu_web_search(
         "Content-Type": "application/json",
     }
 
-    timeout_seconds = (
-        float(timeout)
-        if timeout is not None
-        else float(settings.baidu_search_timeout_seconds)
-    )
+    timeout_seconds = float(timeout) if timeout is not None else float(search_settings.timeout_seconds)
     return _request_baidu_search(
         endpoint=endpoint,
         headers=headers,
@@ -244,8 +240,6 @@ def _format_cli_error(exc: Exception) -> str:
             lines.append(f"  api_message: {exc.api_message}")
         if exc.raw_text:
             lines.append(f"  raw: {exc.raw_text[:300]}")
-
-        # Common onboarding pitfall for Qianfan auth.
         if exc.status_code == 401:
             lines.append(
                 "  hint: Check BAIDU_QIANFAN_API_KEY; use the exact Qianfan API key value only (no 'Bearer' prefix, no quotes, no extra spaces)."
@@ -255,7 +249,6 @@ def _format_cli_error(exc: Exception) -> str:
                 "  hint: Try --timeout 90 or disable deep search with --disable-deep-search during debugging."
             )
         return "\n".join(lines)
-
     return f"[search-debug] ERROR: {exc}"
 
 
@@ -297,7 +290,7 @@ def _format_verbose_metrics(metrics: dict[str, Any], timeout_seconds: float) -> 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Standalone Baidu web search debugger (Backend.search_provider)."
+        description="Standalone Baidu web search debugger (Backend.integrations.search_provider)."
     )
     parser.add_argument(
         "--user-input",
@@ -343,7 +336,6 @@ def main() -> None:
 
     try:
         messages = _parse_messages_json(args.messages_json)
-        request_preview: dict[str, Any] | None = None
         if args.show_request:
             request_preview = _build_debug_request_payload(
                 messages=messages,

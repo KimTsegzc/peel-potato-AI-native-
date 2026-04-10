@@ -35,7 +35,7 @@ jobs:
         run: |
           python - <<'PY'
           from Backend.settings import get_settings
-          from Backend.llm_provider import get_model_list
+          from Backend.integrations import get_model_list
 
           settings = get_settings()
           models = get_model_list()

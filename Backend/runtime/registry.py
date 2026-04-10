@@ -24,6 +24,9 @@ class SkillRegistry:
     def descriptors(self) -> tuple[SkillDescriptor, ...]:
         return tuple(skill.descriptor() for skill in self._skills.values())
 
+    def descriptor_for(self, name: str) -> SkillDescriptor:
+        return self.get(name).descriptor()
+
 
 class ToolRegistry:
     """Placeholder for upcoming tool runtime registration."""

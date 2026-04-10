@@ -5,7 +5,7 @@ import re
 from typing import Any, Iterator
 
 from .... import LLMProvider
-from ....conversation_context import PreparedConversation, finalize_conversation, prepare_conversation
+from ....features.conversation_context import PreparedConversation, finalize_conversation, prepare_conversation
 from ....settings import get_settings
 from ...contracts import AgentRequest, AgentResponse
 from ..base import BaseSkill
@@ -104,6 +104,7 @@ def _build_lookup_messages(
 
 class CCBGetHandlerSkill(BaseSkill):
     name = "skill_ccb_get_handler"
+    display_name = "职能查询"
     description = "查询建设银行分行内部职能分工，按工作职责匹配对应部门、岗位负责人链条和办公号码。"
     routing_hints = (
         "询问分行内部哪个部门、岗位或负责人对接某项工作",
@@ -236,89 +237,6 @@ class CCBGetHandlerSkill(BaseSkill):
         }
         return AgentResponse(content=final_content, metrics=metrics)
 
-import json
-import re
-from typing import Any, Iterator
-
-from .... import LLMProvider
-from ....conversation_context import PreparedConversation, finalize_conversation, prepare_conversation
-from ....settings import get_settings
-from ...contracts import AgentRequest, AgentResponse
-from ..base import BaseSkill
-from .data import CCBHandlerTable, CCBHandlerTableTool, HandlerRecord
-from .prompts import build_lookup_system_prompt, build_lookup_user_prompt
-
-
-def _extract_json_object(text: str) -> dict[str, Any] | None:
-    stripped = (text or "").strip()
-    if not stripped:
-        return None
-
-    if stripped.startswith("```"):
-        stripped = re.sub(r"^```(?:json)?\s*", "", stripped)
-        stripped = re.sub(r"\s*```$", "", stripped)
-
-    try:
-        payload = json.loads(stripped)
-    except json.JSONDecodeError:
-        start = stripped.find("{")
-        end = stripped.rfind("}")
-        if start < 0 or end <= start:
-            return None
-        try:
-            payload = json.loads(stripped[start : end + 1])
-        except json.JSONDecodeError:
-            return None
-
-    return payload if isinstance(payload, dict) else None
-
-
-def _compact_reason(reason: str | None, max_chars: int = 28) -> str:
-    text = re.sub(r"\s+", " ", (reason or "").strip())
-    if not text:
-        return ""
-    if len(text) <= max_chars:
-        return text.rstrip("。；，")
-    return text[: max(0, max_chars - 3)].rstrip("。；， ") + "..."
-
-
-def _build_opening_phrase(record: HandlerRecord, match_reason: str | None) -> str:
-    compact_reason = _compact_reason(match_reason)
-    if compact_reason:
-        return f"我看了下职能表，按职责描述这事更贴近{record.department}的{record.role_display}，应该是这样～"
-    return f"我看了下职能表，这事更像是{record.department}的{record.role_display}在负责，应该是这样～"
-
-
-def _render_not_found_response() -> str:
-    return "\n".join(
-        [
-            "我看了下职能表，这个问题暂时没法明确定位到单一岗位，先给你兜个底～",
-            "职能部门：未找到明确匹配",
-            "岗位：待补充岗",
-            "负责人链条：部门总未明确—分管总未明确—岗位负责人未明确",
-            "工作职责：待补充岗，未提供",
-            "联系方式：未提供",
-        ]
-    )
-
-
-def _format_record_response(
-    table: CCBHandlerTable,
-    record: HandlerRecord,
-    match_reason: str | None = None,
-) -> str:
-    chain = table.resolve_chain(record)
-    return "\n".join(
-        [
-            _build_opening_phrase(record, match_reason),
-            f"职能部门：{record.department}",
-            f"岗位：{record.role_display}",
-            f"负责人链条：{chain.render()}",
-            f"工作职责：{record.role_display}，{record.responsibilities_excerpt()}",
-            f"联系方式：{record.office_phone or '未提供'}",
-        ]
-    )
-
 
 def _build_lookup_messages(
     request: AgentRequest,
@@ -340,6 +258,7 @@ def _build_lookup_messages(
 
 class CCBGetHandlerSkill(BaseSkill):
     name = "skill_ccb_get_handler"
+    display_name = "职能查询"
     description = "查询建设银行分行内部职能分工，按工作职责匹配对应部门、岗位负责人链条和办公号码。"
     routing_hints = (
         "询问分行内部哪个部门、岗位或负责人对接某项工作",

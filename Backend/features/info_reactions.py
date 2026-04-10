@@ -13,7 +13,7 @@ from uuid import uuid4
 from .conversation_context import normalize_session_id
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 _MEMORY_ROOT = REPO_ROOT / "Memory" / "short_term" / "info_reactions"
 _LIKES_DIR = _MEMORY_ROOT / "likes"
 _COMMENTS_DIR = _MEMORY_ROOT / "comments"

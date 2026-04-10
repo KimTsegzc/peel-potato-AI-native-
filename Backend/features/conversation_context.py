@@ -8,12 +8,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from openai import OpenAI
+from ..integrations import LLMProvider
+from ..settings import Settings, get_settings, load_summary_prompt, load_system_prompt
 
-from .settings import Settings, get_settings, load_summary_prompt, load_system_prompt
 
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 _MEMORY_ROOT = REPO_ROOT / "Memory" / "short_term" / "chat_context"
 _HISTORY_DIR = _MEMORY_ROOT / "history"
 _SUMMARY_DIR = _MEMORY_ROOT / "summaries"
@@ -261,9 +260,7 @@ def _generate_summary(
     request_time_text: str,
     time_period_label: str,
 ) -> str:
-    client = OpenAI(api_key=settings.api_key, base_url=settings.base_url)
-    completion = client.chat.completions.create(
-        model=settings.summary_model,
+    response = LLMProvider.with_response_messages(
         messages=[
             {"role": "system", "content": load_summary_prompt()},
             {
@@ -276,12 +273,14 @@ def _generate_summary(
                 ),
             },
         ],
-        temperature=settings.summary_temperature,
-        max_tokens=settings.summary_max_tokens,
-        extra_body={"enable_search": False},
+        model=settings.summary_model,
+        enable_search=False,
+        request_options_override={
+            "temperature": settings.summary_temperature,
+            "max_tokens": settings.summary_max_tokens,
+        },
     )
-    content = completion.choices[0].message.content if completion.choices else ""
-    return str(content or "").strip()
+    return str(response.get("content", "") or "").strip()
 
 
 def finalize_conversation(

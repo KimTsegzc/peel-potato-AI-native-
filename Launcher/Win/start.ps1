@@ -24,7 +24,7 @@ function Find-Python {
     foreach ($venvDir in @(".venv311", ".venv", "venv", ".venv312", ".venv310")) {
         $candidate = Join-Path $RepoRoot "$venvDir\Scripts\python.exe"
         if (Test-Path $candidate) { return $candidate }
-    }
+    } 
 
     if ($env:CONDA_PREFIX) {
         $condaPython = Join-Path $env:CONDA_PREFIX "python.exe"
