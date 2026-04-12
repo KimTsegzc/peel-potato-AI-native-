@@ -107,6 +107,10 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
+说明：
+- 模板已包含 `client_max_body_size 16m;`，用于支持图片/文件上传。
+- 如果线上仍出现 `HTTP 413`，通常说明服务器上的 nginx 配置还没更新或还没 reload。
+
 ## 部署后检查
 
 ```bash

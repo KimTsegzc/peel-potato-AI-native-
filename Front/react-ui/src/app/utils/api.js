@@ -70,6 +70,10 @@ async function uploadFilesToSharedSpace({ apiBase, files, sessionId }) {
     payload = {};
   }
 
+  if (response.status === 413) {
+    throw new Error("上传文件过大，请压缩后重试（当前上限约 16MB）。");
+  }
+
   if (!response.ok || payload.ok === false) {
     throw new Error(payload?.message || `HTTP ${response.status}`);
   }
