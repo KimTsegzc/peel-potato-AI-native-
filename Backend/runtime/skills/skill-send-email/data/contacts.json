@@ -1,8 +1,33 @@
 [
   {
-    "name": "谢鑫",
-    "email": "xiexin1.gd@ccb.com",
-    "aliases": ["鑫哥", "xiexin", "xiexin1"]
+    "name": "朱斌晨",
+    "email": "zhubinchen.gd@ccb.com",
+    "aliases": ["朱行", "zhubinchen"]
+  },
+  {
+    "name": "麦文盛",
+    "email": "maiwensheng.gd@ccb.com",
+    "aliases": ["麦行", "maiwensheng"]
+  },
+  {
+    "name": "戴建军",
+    "email": "daijianjun.gd@ccb.com",
+    "aliases": ["戴行", "daijianjun"]
+  },
+  {
+    "name": "米晋湘",
+    "email": "mijinxiang.gd@ccb.com",
+    "aliases": ["米行", "mijinxiang"]
+  },
+  {
+    "name": "何毅勇",
+    "email": "heyiyong.gd@ccb.com",
+    "aliases": ["何行", "heyiyong"]
+  },
+  {
+    "name": "许流发",
+    "email": "xuliufa.gd@ccb.com",
+    "aliases": ["流发", "xuliufa"]
   },
   {
     "name": "龙江",
@@ -15,13 +40,8 @@
     "aliases": ["玉洁", "zhuyujie"]
   },
   {
-    "name": "许流发",
-    "email": "xuliufa.gd@ccb.com",
-    "aliases": ["流发", "xuliufa"]
-  },
-  {
-    "name": "朱斌晨",
-    "email": "zhubinchen.gd@ccb.com",
-    "aliases": ["朱行", "zhubinchen"]
+    "name": "谢鑫",
+    "email": "xiexin1.gd@ccb.com",
+    "aliases": ["鑫哥", "xiexin", "xiexin1"]
   }
 ]

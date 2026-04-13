@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from .... import LLMProvider
+from ....features.conversation_context import REPO_ROOT
+from ....features.shared_uploads import resolve_attachment_path
 from ....integrations.email_sender import EmailSender, EmailSenderError
 from ...contracts import AgentRequest, AgentResponse
 from ..base import BaseSkill
@@ -32,6 +34,22 @@ _RICH_BODY_REQUEST_RE = re.compile(
     re.IGNORECASE,
 )
 _CONTACT_FILE = Path(__file__).resolve().parent / "data" / "contacts.json"
+_SHARED_SPACE_DIR = REPO_ROOT / "Memory" / "shared_space"
+_PHYSICAL_EXAM_KEYWORD = "体检单"
+_PHYSICAL_EXAM_FIXED_SUBJECT = "广州分行直营中心经营体检数据"
+_PHYSICAL_EXAM_FIXED_BODY = (
+    "广州直营中心客户经理业绩体检简报\n"
+    "现将广州直营中心李东明、江振杰、崔翔越三位直营客户经理2025 年 6 月 —2026 年 2 月业绩体检情况简要汇报如下：\n"
+    "三位整体业绩均达标、增长动力充足，核心指标表现亮眼：\n"
+    "江振杰：综合排名 Top3%，9 项指标全达标，产销业绩 11284.5 万（超中心均值 359%），客户基础与执行能力全面优秀，可作为标杆分享经验。\n"
+    "李东明：综合排名 Top2%，9 项指标 8 项达标，团队贡献分 120（超中心均值 307%），仅客户维护略低于均值，需小幅优化。\n"
+    "崔翔越：综合排名 Top5%，业绩增长突出，AUM 当月新增 1827.388 万（超中心均值 237.3%），客户基础与团队贡献待提升，需制定专项改进计划。\n"
+    "整体来看，团队业绩稳健、优势明显，后续可聚焦短板优化，持续提升客户经营与综合服务能力。"
+)
+_GENERIC_AUDIENCE_RE = re.compile(
+    r"与会人员|参会人员|所有人|全部人|全部联系人|全部联系人|所有联系人|通讯录所有人|通讯录全部人|大家|各位|各位领导同事|领导同事",
+    re.IGNORECASE,
+)
 _CONTACT_SPLIT_RE = re.compile(r"[\s,，。.:：;；()（）\[\]【】<>《》'\"/\\|]+")
 _MULTI_RECEIVER_SPLIT_RE = re.compile(r"\s*(?:,|，|;|；|、|\n|和|及|以及|还有)\s*")
 
@@ -87,6 +105,55 @@ def _extract_attachment_hints(source: dict[str, Any] | None) -> dict[str, Any]:
         "attachments": attachments,
         "memory_refs": memory_refs,
     }
+
+
+def _extract_attachment_paths(attachments: list[dict[str, Any]] | None) -> list[str]:
+    resolved_paths: list[str] = []
+    for item in attachments or []:
+        if not isinstance(item, dict):
+            continue
+        candidate = str(item.get("path") or item.get("file_path") or item.get("filepath") or "").strip()
+        if candidate:
+            resolved_paths.append(candidate)
+    return _dedupe_text_list(resolved_paths)
+
+
+def _extract_request_attachment_paths(request: AgentRequest) -> list[str]:
+    metadata = request.metadata if isinstance(request.metadata, dict) else {}
+    attachments = metadata.get("attachments") if isinstance(metadata.get("attachments"), list) else []
+    resolved_paths: list[str] = []
+    for item in attachments:
+        if not isinstance(item, dict):
+            continue
+        direct_path = str(item.get("path") or item.get("file_path") or item.get("filepath") or "").strip()
+        if direct_path:
+            resolved_paths.append(direct_path)
+            continue
+        resolved_attachment_path = resolve_attachment_path(item)
+        if resolved_attachment_path is not None:
+            resolved_paths.append(str(resolved_attachment_path))
+    return _dedupe_path_list(resolved_paths)
+
+
+def _extract_request_attachment_display_names(request: AgentRequest) -> dict[str, str]:
+    metadata = request.metadata if isinstance(request.metadata, dict) else {}
+    attachments = metadata.get("attachments") if isinstance(metadata.get("attachments"), list) else []
+    display_names: dict[str, str] = {}
+    for item in attachments:
+        if not isinstance(item, dict):
+            continue
+        resolved_attachment_path = None
+        direct_path = str(item.get("path") or item.get("file_path") or item.get("filepath") or "").strip()
+        if direct_path:
+            resolved_attachment_path = Path(direct_path).resolve()
+        else:
+            resolved_attachment_path = resolve_attachment_path(item)
+        if resolved_attachment_path is None:
+            continue
+        display_name = str(item.get("original_name") or item.get("name") or resolved_attachment_path.name).strip()
+        if display_name:
+            display_names[str(resolved_attachment_path)] = display_name
+    return display_names
 
 
 def _parse_email_request(request: AgentRequest) -> tuple[str, str, str | None, dict[str, Any]]:
@@ -160,6 +227,19 @@ def _dedupe_text_list(items: list[str]) -> list[str]:
     return unique_items
 
 
+def _dedupe_path_list(paths: list[str]) -> list[str]:
+    unique_items: list[str] = []
+    seen: set[str] = set()
+    for item in paths:
+        candidate = str(item or "").strip()
+        normalized = str(Path(candidate).resolve()) if candidate else ""
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        unique_items.append(normalized)
+    return unique_items
+
+
 def _normalize_contact_key(text: str) -> str:
     value = (text or "").strip().lower()
     value = re.sub(r"[\s\-_.·]", "", value)
@@ -221,7 +301,7 @@ def _build_contact_maps(contacts: list[dict[str, Any]]) -> tuple[dict[str, dict[
 def _resolve_receivers_from_contacts(receiver: str | None, raw_input: str) -> tuple[list[str], dict[str, Any]]:
     contacts = _load_contacts()
     receiver_tokens = _split_receiver_tokens(receiver)
-    resolved_receivers = _dedupe_text_list(receiver_tokens + _extract_receivers_from_text(raw_input if not receiver_tokens else ""))
+    resolved_receivers = _dedupe_text_list(_extract_receivers_from_text(receiver or "") + _extract_receivers_from_text(raw_input if not receiver_tokens else ""))
 
     if not contacts:
         explicit_emails = _dedupe_text_list(_extract_receivers_from_text(receiver or "") + _extract_receivers_from_text(raw_input))
@@ -274,6 +354,69 @@ def _resolve_receivers_from_contacts(receiver: str | None, raw_input: str) -> tu
         "contact_names": matched_names,
         "unresolved_receivers": unresolved_tokens,
     }
+
+
+def _resolve_all_contact_emails() -> list[str]:
+    contacts = _load_contacts()
+    emails = [str(contact.get("email") or "").strip() for contact in contacts if str(contact.get("email") or "").strip()]
+    return _dedupe_text_list(emails)
+
+
+def _is_generic_audience_request(receiver: str | None, raw_input: str) -> bool:
+    combined = "\n".join(part for part in [str(receiver or "").strip(), str(raw_input or "").strip()] if part)
+    return bool(_GENERIC_AUDIENCE_RE.search(combined))
+
+
+def _find_shared_space_files_by_keyword(keyword: str) -> list[Path]:
+    normalized_keyword = str(keyword or "").strip()
+    if not normalized_keyword or not _SHARED_SPACE_DIR.exists():
+        return []
+    return sorted(
+        [path for path in _SHARED_SPACE_DIR.rglob("*") if path.is_file() and normalized_keyword in path.name],
+        key=lambda item: str(item.relative_to(_SHARED_SPACE_DIR)).lower(),
+    )
+
+
+def _user_explicitly_named_receivers(raw_input: str) -> bool:
+    if _extract_receivers_from_text(raw_input):
+        return True
+    contacts = _load_contacts()
+    _, keywords = _build_contact_maps(contacts)
+    return any(keyword and keyword in (raw_input or "") for keyword, _ in keywords)
+
+
+def _resolve_special_attachments(raw_input: str, attachment_paths: list[str]) -> tuple[list[str], str | None]:
+    resolved_paths = list(attachment_paths)
+    if _PHYSICAL_EXAM_KEYWORD not in (raw_input or ""):
+        return _dedupe_path_list(resolved_paths), None
+
+    matches = _find_shared_space_files_by_keyword(_PHYSICAL_EXAM_KEYWORD)
+    if not matches:
+        return _dedupe_path_list(resolved_paths), f"shared_space 里没有找到名称包含“{_PHYSICAL_EXAM_KEYWORD}”的文件。"
+    if len(matches) > 1:
+        names = "，".join(path.name for path in matches)
+        return _dedupe_path_list(resolved_paths), f"shared_space 里找到了多个“{_PHYSICAL_EXAM_KEYWORD}”附件：{names}。请保留一个后再重试。"
+
+    resolved_paths.append(str(matches[0]))
+    return _dedupe_path_list(resolved_paths), None
+
+
+def _is_physical_exam_email(raw_input: str, attachment_paths: list[str]) -> bool:
+    if _PHYSICAL_EXAM_KEYWORD in (raw_input or ""):
+        return True
+    return any(_PHYSICAL_EXAM_KEYWORD in Path(path).name for path in attachment_paths)
+
+
+def _display_attachment_name(path_text: str, request_display_names: dict[str, str] | None = None) -> str:
+    normalized_path = str(Path(str(path_text or "").strip()).resolve()) if str(path_text or "").strip() else ""
+    if request_display_names and normalized_path in request_display_names:
+        return request_display_names[normalized_path]
+
+    raw_name = Path(normalized_path or path_text).name
+    if _PHYSICAL_EXAM_KEYWORD not in raw_name:
+        return raw_name
+
+    return re.sub(r"^[A-Za-z0-9-]+_", "", raw_name, count=1)
 
 
 def _adapt_email_request_with_llm(request: AgentRequest, model_name: str) -> dict[str, str] | None:
@@ -485,13 +628,19 @@ def _normalize_confirmation_reply(text: str) -> str:
     return re.sub(r"[\s，。；;：:!?！？]", "", value).strip().lower()
 
 
-def _build_receiver_confirmation_prompt(receivers: list[str], *, repeated: bool = False) -> str:
+def _build_receiver_confirmation_prompt(
+    receivers: list[str],
+    *,
+    repeated: bool = False,
+    receiver_display: str | None = None,
+    attachment_names: list[str] | None = None,
+) -> str:
     opening = "我编好内容了，帮我确认一下收件人，我怕打扰到大家~" if not repeated else "我还在等你确认收件人，怕打扰到大家~"
-    return (
-        f"{opening}\n"
-        f"收件人：{'，'.join(receivers) or '未识别'}\n"
-        "回复“是”发送，回复“否”取消。"
-    )
+    lines = [opening, f"收件人：{str(receiver_display or '，'.join(receivers) or '未识别').strip()}"]
+    if attachment_names:
+        lines.append(f"附件：{'，'.join(attachment_names)}")
+    lines.append("回复“是”发送，回复“否”取消。")
+    return "\n".join(lines)
 
 
 def _send_email_and_build_response(
@@ -502,6 +651,7 @@ def _send_email_and_build_response(
     subject: str,
     body: str,
     receivers: list[str],
+    attachments: list[str],
     base_metrics: dict[str, Any],
 ) -> AgentResponse:
     try:
@@ -509,6 +659,7 @@ def _send_email_and_build_response(
             subject=subject,
             body=body,
             receiver=receivers,
+            attachments=attachments,
         )
     except EmailSenderError as exc:
         failure_reason = str(exc)
@@ -531,6 +682,7 @@ def _send_email_and_build_response(
                     "reason": failure_reason,
                     "receiver": ", ".join(receivers),
                     "receivers": receivers,
+                    "attachments": attachments,
                     "subject": subject,
                     **base_metrics,
                     "llm_failure_explainer_used": bool(llm_failure_explanation),
@@ -542,20 +694,26 @@ def _send_email_and_build_response(
     final_receiver = str(result.get("receiver") or ", ".join(receivers))
     final_subject = str(result.get("subject") or subject)
     transport = str(result.get("transport") or "")
+    final_attachments = [str(item or "").strip() for item in result.get("attachments") or attachments if str(item or "").strip()]
     sent_at = datetime.now().strftime("%y年%m月%d日，%H:%M:%S")
+    attachment_names = [Path(item).name for item in final_attachments]
+    content_lines = [
+        "邮件已发送。",
+        f"收件人：{final_receiver or '未返回'}",
+        f"主题：{final_subject}",
+    ]
+    if attachment_names:
+        content_lines.append(f"附件：{'，'.join(attachment_names)}")
+    content_lines.append(f"发送时间: {sent_at}")
     return AgentResponse(
-        content=(
-            "邮件已发送。\n"
-            f"收件人：{final_receiver or '未返回'}\n"
-            f"主题：{final_subject}\n"
-            f"发送时间: {sent_at}"
-        ),
+        content="\n".join(content_lines),
         metrics={
             "skill": skill_name,
             "send_email": {
                 "ok": True,
                 "receiver": final_receiver,
                 "receivers": result.get("receivers") or receivers,
+                "attachments": final_attachments,
                 "subject": final_subject,
                 "transport": transport,
                 "smtp_host": result.get("smtp_host"),
@@ -597,6 +755,11 @@ class SendEmailSkill(BaseSkill):
         if pending_confirmation:
             confirmation_reply = _normalize_confirmation_reply(raw_input)
             receivers = [str(item or "").strip() for item in pending_confirmation.get("receivers") or [] if str(item or "").strip()]
+            attachments = [str(item or "").strip() for item in pending_confirmation.get("attachments") or [] if str(item or "").strip()]
+            pending_attachment_names = pending_confirmation.get("attachment_names") if isinstance(pending_confirmation.get("attachment_names"), list) else []
+            attachment_names = [str(item or "").strip() for item in pending_attachment_names if str(item or "").strip()] or [Path(item).name for item in attachments]
+            pending_base_metrics = pending_confirmation.get("base_metrics") if isinstance(pending_confirmation.get("base_metrics"), dict) else {}
+            receiver_display = str(pending_confirmation.get("receiver_display") or pending_base_metrics.get("receiver_display") or "").strip()
             if _CONFIRM_SEND_YES_RE.fullmatch(confirmation_reply):
                 clear_pending_email_confirmation(request.session_id)
                 return _send_email_and_build_response(
@@ -606,8 +769,9 @@ class SendEmailSkill(BaseSkill):
                     subject=str(pending_confirmation.get("subject") or "").strip(),
                     body=str(pending_confirmation.get("body") or "").strip(),
                     receivers=receivers,
+                    attachments=attachments,
                     base_metrics={
-                        **(pending_confirmation.get("base_metrics") if isinstance(pending_confirmation.get("base_metrics"), dict) else {}),
+                        **pending_base_metrics,
                         "confirmation_required": True,
                         "confirmation_reply": "yes",
                     },
@@ -623,15 +787,21 @@ class SendEmailSkill(BaseSkill):
                             "reason": "user_cancelled",
                             "receiver": "，".join(receivers),
                             "receivers": receivers,
+                            "attachments": attachments,
                             "subject": str(pending_confirmation.get("subject") or "").strip(),
-                            **(pending_confirmation.get("base_metrics") if isinstance(pending_confirmation.get("base_metrics"), dict) else {}),
+                            **pending_base_metrics,
                             "confirmation_required": True,
                             "confirmation_reply": "no",
                         },
                     },
                 )
             return AgentResponse(
-                content=_build_receiver_confirmation_prompt(receivers, repeated=True),
+                content=_build_receiver_confirmation_prompt(
+                    receivers,
+                    repeated=True,
+                    receiver_display=receiver_display or None,
+                    attachment_names=attachment_names,
+                ),
                 metrics={
                     "skill": self.name,
                     "send_email": {
@@ -639,8 +809,9 @@ class SendEmailSkill(BaseSkill):
                         "reason": "confirmation_pending",
                         "receiver": "，".join(receivers),
                         "receivers": receivers,
+                        "attachments": attachments,
                         "subject": str(pending_confirmation.get("subject") or "").strip(),
-                        **(pending_confirmation.get("base_metrics") if isinstance(pending_confirmation.get("base_metrics"), dict) else {}),
+                        **pending_base_metrics,
                         "confirmation_required": True,
                         "confirmation_reply": "other",
                     },
@@ -652,8 +823,33 @@ class SendEmailSkill(BaseSkill):
         explicit_body = bool(isinstance(field_sources, dict) and field_sources.get("body") in {"metadata", "json"})
         attachments = compose_hints.get("attachments") if isinstance(compose_hints, dict) else []
         memory_refs = compose_hints.get("memory_refs") if isinstance(compose_hints, dict) else []
+        request_attachment_display_names = _extract_request_attachment_display_names(request)
+        attachment_paths = _dedupe_path_list(_extract_attachment_paths(attachments) + _extract_request_attachment_paths(request))
         require_rich_body = _needs_rich_body(raw_input)
         body_generated_by_llm = False
+        explicitly_named_receivers = _user_explicitly_named_receivers(raw_input)
+
+        attachment_paths, attachment_error = _resolve_special_attachments(raw_input, attachment_paths)
+        if attachment_error:
+            return AgentResponse(
+                content=f"我先拦截了这次发送：{attachment_error}",
+                metrics={
+                    "skill": self.name,
+                    "send_email": {
+                        "ok": False,
+                        "reason": "attachment_resolution_failed",
+                        "attachment_count": len(attachment_paths),
+                        "memory_ref_count": len(memory_refs),
+                    },
+                },
+            )
+        attachment_names = [_display_attachment_name(item, request_attachment_display_names) for item in attachment_paths]
+        is_physical_exam_email = _is_physical_exam_email(raw_input, attachment_paths)
+        if is_physical_exam_email:
+            subject = _PHYSICAL_EXAM_FIXED_SUBJECT
+            body = _PHYSICAL_EXAM_FIXED_BODY
+            body_generated_by_llm = False
+            explicit_body = True
 
         if _is_mail_history_query(raw_input):
             return AgentResponse(
@@ -694,6 +890,20 @@ class SendEmailSkill(BaseSkill):
         if post_adapter_contact_metrics.get("contact_resolved") or receivers:
             contact_metrics = post_adapter_contact_metrics
 
+        generic_audience_request = _is_generic_audience_request(receiver=receiver, raw_input=raw_input)
+        if generic_audience_request and not explicitly_named_receivers:
+            all_contact_receivers = _resolve_all_contact_emails()
+            if all_contact_receivers:
+                receivers = all_contact_receivers
+                contact_metrics = {
+                    **contact_metrics,
+                    "contact_resolved": True,
+                    "contact_match": "all_contacts",
+                    "contact_names": [str(contact.get("name") or "").strip() for contact in _load_contacts() if str(contact.get("name") or "").strip()],
+                    "unresolved_receivers": [],
+                    "all_contacts_selected": True,
+                }
+
         if not receivers:
             return AgentResponse(
                 content=_build_missing_receiver_tip(),
@@ -707,7 +917,8 @@ class SendEmailSkill(BaseSkill):
                         "llm_adapter_used": llm_adapter_used,
                         "llm_adapter_model": skill_model,
                         "llm_body_refiner_used": llm_body_refiner_used,
-                        "attachment_count": len(attachments),
+                        "attachment_count": len(attachment_paths),
+                        "attachments": attachment_paths,
                         "memory_ref_count": len(memory_refs),
                         "implementation_hint": "大模型互联网搜索",
                         **contact_metrics,
@@ -759,6 +970,7 @@ class SendEmailSkill(BaseSkill):
                         "reason": "low_quality_body_blocked",
                         "receiver": "，".join(receivers),
                         "receivers": receivers,
+                        "attachments": attachment_paths,
                         "subject": subject,
                         "llm_adapter_used": llm_adapter_used,
                         "llm_adapter_model": skill_model,
@@ -782,7 +994,8 @@ class SendEmailSkill(BaseSkill):
                         "llm_adapter_used": llm_adapter_used,
                         "llm_adapter_model": skill_model,
                         "llm_body_refiner_used": llm_body_refiner_used,
-                        "attachment_count": len(attachments),
+                        "attachment_count": len(attachment_paths),
+                        "attachments": attachment_paths,
                         "memory_ref_count": len(memory_refs),
                         "implementation_hint": "大模型互联网搜索",
                         **contact_metrics,
@@ -794,9 +1007,12 @@ class SendEmailSkill(BaseSkill):
             "llm_adapter_used": llm_adapter_used,
             "llm_adapter_model": skill_model,
             "llm_body_refiner_used": llm_body_refiner_used,
-            "attachment_count": len(attachments),
+            "attachment_count": len(attachment_paths),
+            "attachments": attachment_paths,
             "memory_ref_count": len(memory_refs),
             "implementation_hint": "大模型互联网搜索",
+            "receiver_display": "已收录的各位领导同事" if not explicitly_named_receivers else "，".join(receivers),
+            "attachment_names": attachment_names,
             **contact_metrics,
         }
         pending_saved = save_pending_email_confirmation(
@@ -805,6 +1021,9 @@ class SendEmailSkill(BaseSkill):
                 "receivers": receivers,
                 "subject": subject,
                 "body": body,
+                "attachments": attachment_paths,
+                "attachment_names": attachment_names,
+                "receiver_display": str(base_metrics.get("receiver_display") or "").strip(),
                 "base_metrics": base_metrics,
                 "created_at": datetime.now().isoformat(timespec="seconds"),
             },
@@ -822,6 +1041,7 @@ class SendEmailSkill(BaseSkill):
                         "reason": "confirmation_state_unavailable",
                         "receiver": "，".join(receivers),
                         "receivers": receivers,
+                        "attachments": attachment_paths,
                         "subject": subject,
                         **base_metrics,
                         "confirmation_required": True,
@@ -830,7 +1050,11 @@ class SendEmailSkill(BaseSkill):
             )
 
         return AgentResponse(
-            content=_build_receiver_confirmation_prompt(receivers),
+            content=_build_receiver_confirmation_prompt(
+                receivers,
+                receiver_display=str(base_metrics.get("receiver_display") or "").strip() or None,
+                attachment_names=attachment_names,
+            ),
             metrics={
                 "skill": self.name,
                 "send_email": {
@@ -838,6 +1062,7 @@ class SendEmailSkill(BaseSkill):
                     "reason": "confirmation_pending",
                     "receiver": "，".join(receivers),
                     "receivers": receivers,
+                    "attachments": attachment_paths,
                     "subject": subject,
                     **base_metrics,
                     "confirmation_required": True,

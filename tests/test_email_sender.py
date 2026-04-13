@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from Backend.integrations import email_sender
 
@@ -31,6 +32,25 @@ class EmailSenderFooterTests(unittest.TestCase):
             result,
             "测试正文\n\n——本邮件为AI agent发出（来源xiexin1.gd）",
         )
+
+    def test_build_message_attaches_file_with_original_filename(self):
+        temp_file = Path(__file__).resolve().parent / "_temp_体检单.txt"
+        temp_file.write_text("hello", encoding="utf-8")
+        try:
+            message = email_sender._build_message(
+                sender="sender@example.com",
+                receiver="a@example.com",
+                subject="测试",
+                body="正文",
+                attachments=[str(temp_file)],
+            )
+
+            serialized = message.as_string()
+
+            self.assertIn("multipart/mixed", serialized)
+            self.assertIn("Content-Disposition: attachment;", serialized)
+        finally:
+            temp_file.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

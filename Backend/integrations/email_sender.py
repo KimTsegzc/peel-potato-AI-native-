@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import os
 import smtplib
 import ssl
 import re
 import sys
+from email import encoders
+from email.header import Header
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Iterable
@@ -95,8 +100,40 @@ def _validate_email_settings(email_settings: EmailSettings) -> None:
         raise EmailSenderError("EMAIL_USE_SSL and EMAIL_USE_STARTTLS cannot both be true.")
 
 
-def _build_message(*, sender: str, receiver: str, subject: str, body: str) -> MIMEText:
-    msg = MIMEText(body, "plain", "utf-8")
+def _build_message(
+    *,
+    sender: str,
+    receiver: str,
+    subject: str,
+    body: str,
+    attachments: Iterable[str] | None = None,
+) -> MIMEMultipart | MIMEText:
+    attachment_list = [str(item or "").strip() for item in (attachments or []) if str(item or "").strip()]
+    if not attachment_list:
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["From"] = sender
+        msg["To"] = receiver
+        msg["Subject"] = subject
+        return msg
+
+    msg = MIMEMultipart()
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    for file_path in attachment_list:
+        if not os.path.exists(file_path):
+            raise EmailSenderError(f"Attachment does not exist: {file_path}")
+
+        with open(file_path, "rb") as handle:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(handle.read())
+
+        encoders.encode_base64(part)
+        file_name = os.path.basename(file_path)
+        part.add_header(
+            "Content-Disposition",
+            f"attachment; filename*=utf-8''{Header(file_name, 'utf-8').encode()}"
+        )
+        msg.attach(part)
+
     msg["From"] = sender
     msg["To"] = receiver
     msg["Subject"] = subject
@@ -117,6 +154,7 @@ def send_text_email(
     subject: str,
     body: str,
     receiver: str | Iterable[str] | None = None,
+    attachments: Iterable[str] | None = None,
     settings: Settings | None = None,
 ) -> dict[str, str | int | bool | list[str]]:
     """Send a plain text email using SMTP settings from environment/.env."""
@@ -137,7 +175,9 @@ def send_text_email(
         receiver=resolved_receiver_display,
         subject=(subject or "").strip(),
         body=final_body,
+        attachments=attachments,
     )
+    resolved_attachments = [str(item or "").strip() for item in (attachments or []) if str(item or "").strip()]
 
     try:
         if email_settings.use_ssl:
@@ -165,6 +205,7 @@ def send_text_email(
         "receiver": resolved_receiver_display,
         "receivers": resolved_receivers,
         "subject": (subject or "").strip(),
+        "attachments": resolved_attachments,
         "transport": "ssl" if email_settings.use_ssl else "starttls" if email_settings.use_starttls else "plain",
     }
 
@@ -178,12 +219,14 @@ class EmailSender:
         subject: str,
         body: str,
         receiver: str | Iterable[str] | None = None,
+        attachments: Iterable[str] | None = None,
         settings: Settings | None = None,
     ) -> dict[str, str | int | bool | list[str]]:
         return send_text_email(
             subject=subject,
             body=body,
             receiver=receiver,
+            attachments=attachments,
             settings=settings,
         )
 
